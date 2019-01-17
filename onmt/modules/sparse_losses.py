@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Function
-from onmt.modules.sparse_activations import _threshold_and_support
+from onmt.modules.sparse_activations import _threshold_and_support, tsallis15
 from onmt.utils.misc import aeq
 
 
@@ -75,3 +75,58 @@ class SparsemaxLoss(nn.Module):
         elif self.reduction == 'elementwise_mean':
             loss = loss.sum() / size
         return loss
+
+
+class ConjugateFunction(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, theta, grad, Omega):
+        ctx.save_for_backward(grad)
+        return torch.sum(theta * grad, dim=1) - Omega(grad)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad, = ctx.saved_tensors
+        return grad * grad_output.view(-1, 1), None, None
+
+
+class FYLoss(torch.nn.Module):
+
+    def __init__(self, weights="average"):
+        self.weights = weights
+        super(FYLoss, self).__init__()
+
+    def forward(self, theta, y_true):
+        self.y_pred = self.predict(theta)
+        ret = ConjugateFunction.apply(theta, self.y_pred, self.Omega)
+
+        if len(y_true.shape) == 2:
+            # y_true contains label proportions
+            ret += self.Omega(y_true)
+            ret -= torch.sum(y_true * theta, dim=1)
+
+        elif len(y_true.shape) == 1:
+            # y_true contains label integers (0, ..., n_classes-1)
+
+            if y_true.dtype != torch.long:
+                raise ValueError("y_true should contains long integers.")
+
+            all_rows = torch.arange(y_true.shape[0])
+            ret -= theta[all_rows, y_true]
+
+        else:
+            raise ValueError("Invalid shape for y_true.")
+
+        if self.weights == "average":
+            return torch.mean(ret)
+        else:
+            return torch.sum(ret)
+
+
+class Tsallis15Loss(FYLoss):
+
+    def predict(self, theta):
+        return tsallis15(theta, 1)
+
+    def Omega(self, p):
+        return (4 / 3) * (torch.sum((p ** 1.5), dim=1) - 1)

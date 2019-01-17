@@ -92,3 +92,67 @@ class LogSparsemax(nn.Module):
 
     def forward(self, input):
         return torch.log(sparsemax(input, self.dim))
+
+
+class Tsallis15Function(Function):
+    @staticmethod
+    def forward(ctx, X, dim=0):
+        ctx.dim = dim
+
+        max_val, _ = X.max(dim=dim, keepdim=True)
+        X = X - max_val  # same numerical stability trick as for softmax
+
+        X = X / 2  # divide by 2 to solve actual Tsallis
+
+        Xsrt, _ = torch.sort(X, descending=True, dim=dim)
+
+        rho = _make_ix_like(X, dim)
+        mean = Xsrt.cumsum(dim) / rho
+        mean_sq = (Xsrt ** 2).cumsum(dim) / rho
+        ss = rho * (mean_sq - mean ** 2)
+        delta = (1 - ss) / rho
+
+        # NOTE this is not exactly the same as in reference algo
+        # Fortunately it seems the clamped values never wrongly
+        # get selected by tau <= sorted_z. Prove this!
+        delta_nz = torch.clamp(delta, 0)
+        tau = mean - torch.sqrt(delta_nz)
+
+        support_size = (tau <= Xsrt).sum(dim).unsqueeze(dim)
+        tau_star = tau.gather(dim, support_size - 1)
+        Y = torch.clamp(X - tau_star, min=0) ** 2
+        ctx.save_for_backward(Y)
+        return Y
+
+    @staticmethod
+    def backward(ctx, dY):
+        Y, = ctx.saved_tensors
+        gppr = Y.sqrt()  # = 1 / g'' (Y)
+        dX = dY * gppr
+        q = dX.sum(ctx.dim) / gppr.sum(ctx.dim)
+        q = q.unsqueeze(ctx.dim)
+        dX -= q * gppr
+        return dX, None
+
+
+tsallis15 = Tsallis15Function.apply
+
+
+class Tsallis15(torch.nn.Module):
+
+    def __init__(self, dim=0):
+        self.dim = dim
+        super(Tsallis15, self).__init__()
+
+    def forward(self, X):
+        return tsallis15(X, self.dim)
+
+
+class LogTsallis15(torch.nn.Module):
+
+    def __init__(self, dim=0):
+        self.dim = dim
+        super(Tsallis15, self).__init__()
+
+    def forward(self, X):
+        return torch.log(tsallis15(X, self.dim))
