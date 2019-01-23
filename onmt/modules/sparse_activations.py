@@ -152,7 +152,7 @@ class LogTsallis15(torch.nn.Module):
 
     def __init__(self, dim=0):
         self.dim = dim
-        super(Tsallis15, self).__init__()
+        super(LogTsallis15, self).__init__()
 
     def forward(self, X):
         return torch.log(tsallis15(X, self.dim))

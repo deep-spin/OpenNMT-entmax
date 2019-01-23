@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from onmt.modules.sparse_activations import sparsemax
+from onmt.modules.sparse_activations import sparsemax, tsallis15
 from onmt.utils.misc import aeq, sequence_mask
 
 # This class is mainly used by decoder.py for RNNs but also
@@ -75,8 +75,8 @@ class GlobalAttention(nn.Module):
         assert attn_type in ["dot", "general", "mlp"], (
             "Please select a valid attention type.")
         self.attn_type = attn_type
-        assert attn_func in ["softmax", "sparsemax"], (
-            "Please select a valid attention function.")
+        assert attn_func in ["softmax", "sparsemax", "tsallis15"], \
+            "Please select a valid attention function."
         self.attn_func = attn_func
 
         if self.attn_type == "general":
@@ -185,8 +185,10 @@ class GlobalAttention(nn.Module):
         # Softmax or sparsemax to normalize attention weights
         if self.attn_func == "softmax":
             align_vectors = F.softmax(align.view(batch*target_l, source_l), -1)
-        else:
+        elif self.attn_func == "sparsemax":
             align_vectors = sparsemax(align.view(batch*target_l, source_l), -1)
+        else:
+            align_vectors = tsallis15(align.view(batch*target_l, source_l), -1)
         align_vectors = align_vectors.view(batch, target_l, source_l)
 
         # each context vector c_t is the weighted average

@@ -222,6 +222,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
     if not model_opt.copy_attn:
         if model_opt.generator_function == "sparsemax":
             gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
+        elif model_opt.generator_function == "tsallis15":
+            gen_func = onmt.modules.sparse_activations.LogTsallis15(dim=-1)
         else:
             gen_func = nn.LogSoftmax(dim=-1)
         generator = nn.Sequential(

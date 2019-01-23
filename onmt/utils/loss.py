@@ -9,8 +9,8 @@ import torch.nn.functional as F
 
 import onmt
 import onmt.inputters as inputters
-from onmt.modules.sparse_losses import SparsemaxLoss
-from onmt.modules.sparse_activations import LogSparsemax
+from onmt.modules.sparse_losses import SparsemaxLoss, Tsallis15Loss
+from onmt.modules.sparse_activations import LogSparsemax, LogTsallis15
 
 
 def build_loss_compute(model, tgt_vocab, opt, train=True):
@@ -38,6 +38,8 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
         )
     elif isinstance(model.generator[1], LogSparsemax):
         criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
+    elif isinstance(model.generator[1], LogTsallis15):
+        criterion = Tsallis15Loss(ignore_index=padding_idx, weights='sum')
     else:
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
 
@@ -45,7 +47,8 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
     # probabilities, only the first part of the generator needs to be
     # passed to the NMTLossCompute. At the moment, the only supported
     # loss function of this kind is the sparsemax loss.
-    use_raw_logits = isinstance(criterion, SparsemaxLoss)
+    use_raw_logits = isinstance(criterion, SparsemaxLoss) or \
+        isinstance(criterion, Tsallis15Loss)
     loss_gen = model.generator[0] if use_raw_logits else model.generator
     if opt.copy_attn:
         compute = onmt.modules.CopyGeneratorLossCompute(

@@ -77,7 +77,7 @@ class SparsemaxLoss(nn.Module):
         return loss
 
 
-class ConjugateFunction(torch.autograd.Function):
+class ConjugateFunction(Function):
 
     @staticmethod
     def forward(ctx, theta, grad, Omega):
@@ -90,19 +90,28 @@ class ConjugateFunction(torch.autograd.Function):
         return grad * grad_output.view(-1, 1), None, None
 
 
+conjugate = ConjugateFunction.apply
+
+
 class FYLoss(torch.nn.Module):
 
-    def __init__(self, weights="average"):
+    def __init__(self, weights="average", ignore_index=-100):
         self.weights = weights
+        self.ignore_index = ignore_index
         super(FYLoss, self).__init__()
 
     def forward(self, theta, y_true):
-        self.y_pred = self.predict(theta)
-        ret = ConjugateFunction.apply(theta, self.y_pred, self.Omega)
+        """
+        theta (FloatTensor): (batch*seq len x tgt vocab)
+        y_true (LongTensor): (tgt vocab)
+        """
+        y_pred = self.predict(theta)
+        ret = conjugate(theta, y_pred, self.Omega)
 
         if len(y_true.shape) == 2:
             # y_true contains label proportions
             ret += self.Omega(y_true)
+            print(self.Omega(y_true))
             ret -= torch.sum(y_true * theta, dim=1)
 
         elif len(y_true.shape) == 1:
@@ -117,6 +126,11 @@ class FYLoss(torch.nn.Module):
         else:
             raise ValueError("Invalid shape for y_true.")
 
+        '''
+        if self.ignore_index >= 0:
+            ignored_positions = y_true == self.ignore_index
+            ret.masked_fill_(ignored_positions, 0.0)
+        '''
         if self.weights == "average":
             return torch.mean(ret)
         else:
