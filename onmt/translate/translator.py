@@ -104,14 +104,13 @@ class Translator(object):
         self.use_filter_pred = False
 
         # for debugging
-        self.beam_trace = self.dump_beam != ""
-        self.beam_accum = None
-        if self.beam_trace:
+        if opt.dump_beam != "":
             self.beam_accum = {
                 "predicted_ids": [],
                 "beam_parent_ids": [],
-                "scores": [],
-                "log_probs": []}
+                "scores": []}
+        else:
+            self.beam_accum = None
 
     def translate(self,
                   src_path=None,
@@ -265,7 +264,7 @@ class Translator(object):
 
         if self.dump_beam:
             import json
-            json.dump(self.translator.beam_accum,
+            json.dump(self.beam_accum,
                       codecs.open(self.dump_beam, 'w', 'utf-8'))
         return all_scores, all_predictions
 
@@ -665,6 +664,16 @@ class Translator(object):
             results["predictions"].append(hyps)
             results["scores"].append(scores)
             results["attention"].append(attn)
+
+            if self.beam_accum is not None:
+                self.beam_accum["beam_parent_ids"].append(
+                    [t.tolist() for t in b.prev_ks])
+                self.beam_accum["scores"].append([
+                    ["%4f" % s for s in t.tolist()]
+                    for t in b.all_scores][1:])
+                self.beam_accum["predicted_ids"].append(
+                    [[vocab.itos[i] for i in t.tolist()]
+                     for t in b.next_ys][1:])
 
         return results
 
