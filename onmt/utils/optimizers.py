@@ -209,6 +209,14 @@ class Optimizer(object):
             for op in self.optimizer.optimizers:
                 op.param_groups[0]['lr'] = self.learning_rate
 
+    def decay_learning_rate(self):
+        self.learning_rate *= self.lr_decay
+        if self.method != 'sparseadam':
+            self.optimizer.param_groups[0]['lr'] = self.learning_rate
+        else:
+            for op in self.optimizer.optimizers:
+                op.param_groups[0]['lr'] = self.learning_rate
+
     def step(self):
         """Update the model parameters based on current gradients.
 
@@ -216,7 +224,7 @@ class Optimizer(object):
         rate.
         """
         self._step += 1
-
+        
         # Decay method used in tensor2tensor.
         if self.decay_method == "noam":
             self._set_rate(
@@ -225,7 +233,7 @@ class Optimizer(object):
                  min(self._step ** (-0.5),
                      self._step * self.warmup_steps**(-1.5))))
         # Decay based on start_decay_steps every decay_steps
-        else:
+        elif self.decay_method != "smart":
             if ((self.start_decay_steps is not None) and (
                      self._step >= self.start_decay_steps)):
                 self.start_decay = True
@@ -236,7 +244,7 @@ class Optimizer(object):
 
         if self.method != 'sparseadam':
             self.optimizer.param_groups[0]['lr'] = self.learning_rate
-
+        
         if self.max_grad_norm:
             clip_grad_norm_(self.params, self.max_grad_norm)
         self.optimizer.step()
