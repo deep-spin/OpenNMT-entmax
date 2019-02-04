@@ -200,7 +200,7 @@ class Trainer(object):
                                               step, valid_stats=valid_stats)
                             if self.optim.decay_method == 'smart' and valid_stats.loss > previous_valid_loss:
                                 self.optim.decay_learning_rate()
-                                previous_valid_loss = valid_stats.loss
+                            previous_valid_loss = valid_stats.loss
 
                         if self.gpu_rank == 0:
                             self._maybe_save(step)
