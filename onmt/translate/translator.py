@@ -111,6 +111,7 @@ class Translator(object):
                 "scores": []}
         else:
             self.beam_accum = None
+        self.attn_out = opt.attn_out
 
     def translate(self,
                   src_path=None,
@@ -186,6 +187,8 @@ class Translator(object):
         all_scores = []
         all_predictions = []
 
+        attn_plots = []
+
         for batch in data_iter:
             batch_data = self.translate_batch(batch, data, attn_debug,
                                               fast=self.fast)
@@ -213,6 +216,11 @@ class Translator(object):
                     else:
                         os.write(1, output.encode('utf-8'))
 
+                if self.attn_out is not None:
+                    plot = {'src': trans.src_raw,
+                            'pred': trans.pred_sents[0] + ['</s>'],
+                            'attns': trans.attns[0].cpu()}
+                    attn_plots.append(plot)
                 # Debug attention.
                 if attn_debug:
                     preds = trans.pred_sents[0]
@@ -266,6 +274,8 @@ class Translator(object):
             import json
             json.dump(self.beam_accum,
                       codecs.open(self.dump_beam, 'w', 'utf-8'))
+        if self.attn_out is not None:
+            torch.save(attn_plots, self.attn_out)
         return all_scores, all_predictions
 
     def translate_batch(self, batch, data, attn_debug, fast=False):
