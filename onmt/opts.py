@@ -442,7 +442,8 @@ def train_opts(parser):
               help="""Decay every decay_steps""")
 
     group.add('--decay_method', '-decay_method', type=str, default="none",
-              choices=['noam', 'none', 'smart'], help="Use a custom decay rate.")
+              choices=['noam', 'none', 'smart'],
+              help="Use a custom decay rate.")
     group.add('--warmup_steps', '-warmup_steps', type=int, default=4000,
               help="""Number of warmup steps for custom decay.""")
 
@@ -583,6 +584,7 @@ def translate_opts(parser):
     group.add('--attn_debug', '-attn_debug', action="store_true",
               help='Print best attn for each word')
     group.add('--attn_out', '-attn_out')
+    group.add('--beam_score_out', '-beam_score_out')
     group.add('--dump_beam', '-dump_beam', type=str, default="",
               help='File to dump beam information to.')
     group.add('--n_best', '-n_best', type=int, default=1,

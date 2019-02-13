@@ -55,7 +55,7 @@ class PenaltyBuilder(object):
         """
         returns zero as penalty
         """
-        return beam.scores.clone().fill_(0.0)
+        return 0.0
 
     def length_wu(self, beam, logprobs, alpha=0.):
         """
