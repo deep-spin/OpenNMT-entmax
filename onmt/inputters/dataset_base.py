@@ -34,10 +34,6 @@ class DatasetBase(torchtext.data.Dataset):
     def __setstate__(self, _d):
         self.__dict__.update(_d)
 
-    def __reduce_ex__(self, proto):
-        "This is a hack. Something is broken with torch pickle."
-        return super(DatasetBase, self).__reduce_ex__()
-
     def load_fields(self, vocab_dict):
         """ Load fields from vocab.pt, and set the `fields` attribute.
 
