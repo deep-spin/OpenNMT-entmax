@@ -41,7 +41,7 @@ class SparsemaxVladLossFunction(Function):
 class Tsallis15VladLossFunction(Function):
 
     @staticmethod
-    def forward(ctx, input, target, alpha=1.5):
+    def forward(ctx, input, target):
         """
         input (FloatTensor): n x num_classes
         target (LongTensor): n, the indices of the target classes
@@ -50,7 +50,7 @@ class Tsallis15VladLossFunction(Function):
 
         p_star = tsallis15(input.clone(), 1)
 
-        loss = -(p_star ** alpha).sum(dim=1)
+        loss = -(p_star * torch.sqrt(p_star)).sum(dim=1)
         loss += 1
         loss *= 4 / 3
 
