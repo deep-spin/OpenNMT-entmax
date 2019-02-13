@@ -4,6 +4,7 @@ import torch
 
 from onmt.modules.sparse_activations import Sparsemax, Tsallis15
 from onmt.modules.sparse_losses import SparsemaxLoss, Tsallis15Loss
+from onmt.modules.root_finding import TsallisSecant
 
 
 def bench(f):
@@ -55,6 +56,12 @@ if __name__ == '__main__':
     def _tsallis():
         return Tsallis15(dim=-1)(x)
 
+    def _tsallis_secant():
+        return TsallisSecant(alpha=1.5, dim=-1, n_iter=1000, tol=1e-5)(x)
+
+    def _sparsemax_secant():
+        return TsallisSecant(alpha=2, dim=-1, n_iter=1000, tol=1e-5)(x)
+
     def softmax_loss():
         lsm = torch.nn.LogSoftmax(dim=-1)
         nll = torch.nn.NLLLoss(ignore_index=ignore_index, reduction='sum')
@@ -65,6 +72,8 @@ if __name__ == '__main__':
         sp = SparsemaxLoss(ignore_index=ignore_index, reduction='sum')
 
         return sp(x, y)
+
+    print(torch.mean((_tsallis_secant() - _tsallis()) ** 2))
 
     torch.cuda.synchronize()
     torch.cuda.synchronize()
@@ -77,6 +86,12 @@ if __name__ == '__main__':
 
     softmax_timings = bench(_softmax)
     print("softmax   ", np.percentile(softmax_timings, [25, 50, 75]))
+
+    secant_timings = bench(_tsallis_secant)
+    print("secant 1.5", np.percentile(secant_timings, [25, 50, 75]))
+
+    secant_timings = bench(_sparsemax_secant)
+    print("secant   2", np.percentile(secant_timings, [25, 50, 75]))
 
     sparsemax_timings = bench(_sparsemax)
     print("sparsemax ", np.percentile(sparsemax_timings, [25, 50, 75]))
