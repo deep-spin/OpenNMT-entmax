@@ -3,7 +3,17 @@ import numpy as np
 import torch
 
 from onmt.modules.sparse_activations import Sparsemax, Tsallis15
-from onmt.modules.sparse_losses import SparsemaxLoss, Tsallis15Loss
+from onmt.modules.sparse_losses_vlad import (
+        sparsemax_vlad_loss,
+        tsallis15_vlad_loss,
+)
+from onmt.modules.root_finding import (
+    sparsemax_bisect,
+    tsallis_bisect,
+    sparsemax_bisect_loss,
+    tsallis_bisect_loss,
+)
+
 # from onmt.modules.root_finding import TsallisSecant, SparsemaxSecant
 
 
@@ -30,12 +40,13 @@ if __name__ == '__main__':
         location = sys.argv[1]
 
     x = torch.load('test_input.pt', map_location=location)
+    y = torch.load('test_target.pt', map_location=location)
     # x = torch.randn(1280, 35820, device=location)
 
-    # x = x[:1, :100000] # .to(dtype=torch.float64)
-    # x.detach_()
+    # x = x[:, :100]
 
     print("x", x.shape, x.device, x.dtype)
+    print("y", y.shape, y.device, y.dtype)
 
     def _sort():
         return torch.sort(x, dim=-1)
@@ -52,50 +63,72 @@ if __name__ == '__main__':
     def _tsallis():
         return Tsallis15(dim=-1)(x)
 
-#    def _tsallis_secant():
-#        return TsallisSecant(alpha=1.5, dim=-1, n_iter=100000, tol=1e-6)(x)
+    def _sparsemax_bisect():
+        return sparsemax_bisect(x, 10)
 
-#   specialized method is faster
-#    def _sparsemax_secant2():
-#        return TsallisSecant(alpha=2, dim=-1, n_iter=100, tol=1e-5)(x)
+    def _sparsemax_loss():
+        return sparsemax_vlad_loss(x, y)
 
-#    def _sparsemax_secant():
-#        return SparsemaxSecant(dim=-1, n_iter=100000, tol=1e-6)(x)
+    def _sparsemax_bisect_loss():
+        return sparsemax_bisect_loss(x, y, 10)
 
-    def softmax_loss():
+    def _tsallis_bisect():
+        return tsallis_bisect(x, 1.5, 10)
+
+    def _tsallis_loss():
+        return tsallis15_vlad_loss(x, y)
+
+    def _tsallis_bisect_loss():
+        return tsallis_bisect_loss(x, y, 1.5, 10)
+
+    def __softmax_loss():
         lsm = torch.nn.LogSoftmax(dim=-1)
         nll = torch.nn.NLLLoss(ignore_index=ignore_index, reduction='sum')
 
         return nll(lsm(x), y)
 
-    def sparsemax_loss():
+    def __sparsemax_loss():
         sp = SparsemaxLoss(ignore_index=ignore_index, reduction='sum')
 
         return sp(x, y)
 
-#    print("tsallis accuracy", torch.sum((_tsallis_secant() - _tsallis()) ** 2))
-#    print("sparsemax accuracy", torch.sum((_sparsemax_secant() - _sparsemax()) ** 2))
+    print("tsallis accuracy", torch.max((_tsallis_bisect() - _tsallis()) ** 2))
+    print("sparsemax accuracy", torch.max((_sparsemax_bisect() - _sparsemax()) ** 2))
 
     torch.cuda.synchronize()
     torch.cuda.synchronize()
 
-    sort_timings = bench(_sort)
-    print("sorting x ", np.percentile(sort_timings, [25, 50, 75]))
+#    sort_timings = bench(_sort)
+#    print("sorting x ", np.percentile(sort_timings, [25, 50, 75]))
 
-    topk_timings = bench(_topk)
-    print("top 100 x ", np.percentile(topk_timings, [25, 50, 75]))
+#    topk_timings = bench(_topk)
+#    print("top 100 x ", np.percentile(topk_timings, [25, 50, 75]))
 
     softmax_timings = bench(_softmax)
     print("softmax   ", np.percentile(softmax_timings, [25, 50, 75]))
 
-#     secant_timings = bench(_tsallis_secant)
-#     print("secant 1.5", np.percentile(secant_timings, [25, 50, 75]))
-#
-#     secant_timings = bench(_sparsemax_secant)
-#     print("secant   2", np.percentile(secant_timings, [25, 50, 75]))
-
     sparsemax_timings = bench(_sparsemax)
     print("sparsemax ", np.percentile(sparsemax_timings, [25, 50, 75]))
 
+    sparsemax_b_timings = bench(_sparsemax_bisect)
+    print("bisect a=2", np.percentile(sparsemax_b_timings, [25, 50, 75]))
+
     tsallis_timings = bench(_tsallis)
     print("tsallis15 ", np.percentile(tsallis_timings, [25, 50, 75]))
+
+    tsallis_b_timings = bench(_tsallis_bisect)
+    print("bis a=1.5 ", np.percentile(tsallis_b_timings, [25, 50, 75]))
+
+    sp_loss_timings = bench(_sparsemax_loss)
+    print("loss   a=2", np.percentile(sp_loss_timings, [25, 50, 75]))
+
+    sp_loss_timings = bench(_sparsemax_bisect_loss)
+    print("ls bis a=2", np.percentile(sp_loss_timings, [25, 50, 75]))
+
+    ts_loss_timings = bench(_tsallis_loss)
+    print("loss a=1.5", np.percentile(ts_loss_timings, [25, 50, 75]))
+
+    ts_loss_timings = bench(_tsallis_bisect_loss)
+    print("lsbs a=1.5", np.percentile(ts_loss_timings, [25, 50, 75]))
+
+

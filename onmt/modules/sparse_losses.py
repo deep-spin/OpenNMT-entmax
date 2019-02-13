@@ -22,7 +22,7 @@ class SparsemaxLossFunction(Function):
         support = input > tau_z
         x = torch.where(
             support, input**2 - tau_z**2,
-            torch.tensor(0.0, device=input.device)
+            torch.tensor(0.0, dtype=input.dtype, device=input.device)
         ).sum(dim=1)
         ctx.save_for_backward(input, target, tau_z)
         # clamping necessary because of numerical errors: loss should be lower
@@ -144,3 +144,5 @@ class Tsallis15Loss(FYLoss):
 
     def Omega(self, p):
         return (4 / 3) * (torch.sum((p ** 1.5), dim=1) - 1)
+
+
