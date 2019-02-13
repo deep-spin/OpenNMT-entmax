@@ -4,7 +4,7 @@ import torch
 
 from onmt.modules.sparse_activations import Sparsemax, Tsallis15
 from onmt.modules.sparse_losses import SparsemaxLoss, Tsallis15Loss
-from onmt.modules.root_finding import TsallisSecant, SparsemaxSecant
+# from onmt.modules.root_finding import TsallisSecant, SparsemaxSecant
 
 
 def bench(f):
