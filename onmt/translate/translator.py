@@ -113,6 +113,8 @@ class Translator(object):
         else:
             self.beam_accum = None
         self.attn_out = opt.attn_out
+        self.beam_score_out = opt.beam_score_out
+        self.beam_scores = [] if opt.beam_score_out is not None else None
 
     def translate(self,
                   src_path=None,
@@ -277,6 +279,8 @@ class Translator(object):
                       codecs.open(self.dump_beam, 'w', 'utf-8'))
         if self.attn_out is not None:
             torch.save(attn_plots, self.attn_out)
+        if self.beam_score_out is not None:
+            torch.save(self.beam_scores, self.beam_score_out)
         return all_scores, all_predictions
 
     def translate_batch(self, batch, data, attn_debug, fast=False):
@@ -675,11 +679,6 @@ class Translator(object):
             results["scores"].append(scores)
             results["attention"].append(attn)
 
-            # b.all_scores is a list. The elements in it are tensors of size
-            # beam, with scores in them
-            # all_raw_scores = [torch.exp(t) for t in b.all_scores[1:]]
-            # print([t.sum().item() for t in all_raw_scores])
-            # print([t.gt(0).sum().item() for t in all_raw_scores])
             if self.beam_accum is not None:
                 parent_ids = [t.tolist() for t in b.prev_ks]
                 self.beam_accum["beam_parent_ids"].append(parent_ids)
@@ -689,6 +688,9 @@ class Translator(object):
                 pred_ids = [[vocab.itos[i] for i in t.tolist()]
                             for t in b.next_ys][1:]
                 self.beam_accum["predicted_ids"].append(pred_ids)
+
+            if self.beam_scores is not None:
+                self.beam_scores.append(torch.stack(b.all_scores).cpu())
 
         return results
 
