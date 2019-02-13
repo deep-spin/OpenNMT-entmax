@@ -26,18 +26,18 @@ class Beam(object):
                  exclusion_tokens=set()):
 
         self.size = size
-        self.tt = torch.cuda if cuda else torch
+        device = torch.device('cuda') if cuda else torch.device('cpu')
 
         # The score for each translation on the beam.
-        self.scores = self.tt.FloatTensor(size).zero_()
+        self.scores = torch.zeros(size, device=device)
         self.all_scores = []
 
         # The backpointers at each time-step.
         self.prev_ks = []
 
         # The outputs at each time-step.
-        self.next_ys = [self.tt.LongTensor(size)
-                        .fill_(pad)]
+        self.next_ys = [torch.full((size,), pad, device=device,
+                                   dtype=torch.long)]
         self.next_ys[0][0] = bos
 
         # Has EOS topped the beam yet.
@@ -63,11 +63,13 @@ class Beam(object):
         self.block_ngram_repeat = block_ngram_repeat
         self.exclusion_tokens = exclusion_tokens
 
-    def get_current_state(self):
+    @property
+    def current_state(self):
         "Get the outputs for the current timestep."
         return self.next_ys[-1]
 
-    def get_current_origin(self):
+    @property
+    def current_origin(self):
         "Get the backpointers for the current timestep."
         return self.prev_ks[-1]
 
@@ -80,8 +82,6 @@ class Beam(object):
 
         * `word_probs`- probs of advancing from the last step (K x words)
         * `attn_out`- attention at the last step
-
-        Returns: True if beam search is complete.
         """
         num_words = word_probs.size(1)
         if self.stepwise_penalty:
@@ -103,7 +103,7 @@ class Beam(object):
             if self.block_ngram_repeat > 0:
                 ngrams = []
                 le = len(self.next_ys)
-                for j in range(self.next_ys[-1].size(0)):
+                for j in range(self.current_state.size(0)):
                     hyp, _ = self.get_hyp(le - 1, j)
                     ngrams = set()
                     fail = False
@@ -122,12 +122,10 @@ class Beam(object):
                         beam_scores[j] = -10e20
         else:
             beam_scores = word_probs[0]
-        flat_beam_scores = beam_scores.view(-1)
-        best_scores, best_scores_id = flat_beam_scores.topk(self.size, 0,
-                                                            True, True)
+        best_scores, best_scores_id = beam_scores.view(-1).topk(self.size, 0)
 
         self.all_scores.append(self.scores)
-        self.scores = best_scores
+        self.scores = best_scores  # is it possible to get rid of self.scores?
 
         # best_scores_id is flattened beam x word array, so calculate which
         # word and beam each score came from
@@ -149,6 +147,8 @@ class Beam(object):
             self.eos_top = True
 
     def done(self):
+        # this assumes density
+        # what is the other condition that means the thing is done?
         return self.eos_top and len(self.finished) >= self.n_best
 
     def sort_finished(self, minimum=None):

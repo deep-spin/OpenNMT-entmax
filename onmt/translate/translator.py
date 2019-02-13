@@ -13,6 +13,7 @@ from onmt.utils.misc import tile
 
 import onmt.model_builder
 import onmt.translate.beam
+from onmt.translate.beam import Beam
 import onmt.inputters as inputters
 import onmt.opts as opts
 import onmt.decoders.ensemble
@@ -586,17 +587,17 @@ class Translator(object):
         exclusion_tokens = set([vocab.stoi[t]
                                 for t in self.ignore_when_blocking])
 
-        beam = [onmt.translate.Beam(beam_size, n_best=self.n_best,
-                                    cuda=self.cuda,
-                                    global_scorer=self.global_scorer,
-                                    pad=vocab.stoi[inputters.PAD_WORD],
-                                    eos=vocab.stoi[inputters.EOS_WORD],
-                                    bos=vocab.stoi[inputters.BOS_WORD],
-                                    min_length=self.min_length,
-                                    stepwise_penalty=self.stepwise_penalty,
-                                    block_ngram_repeat=self.block_ngram_repeat,
-                                    exclusion_tokens=exclusion_tokens)
-                for __ in range(batch_size)]
+        beam_batch = [Beam(beam_size, n_best=self.n_best,
+                           cuda=self.cuda,
+                           global_scorer=self.global_scorer,
+                           pad=vocab.stoi[inputters.PAD_WORD],
+                           eos=vocab.stoi[inputters.EOS_WORD],
+                           bos=vocab.stoi[inputters.BOS_WORD],
+                           min_length=self.min_length,
+                           stepwise_penalty=self.stepwise_penalty,
+                           block_ngram_repeat=self.block_ngram_repeat,
+                           exclusion_tokens=exclusion_tokens)
+                      for __ in range(batch_size)]
 
         # (1) Run the encoder on the src.
         src, enc_states, memory_bank, src_lengths = self._run_encoder(
@@ -631,13 +632,13 @@ class Translator(object):
 
         # (3) run the decoder to generate sentences, using beam search.
         for i in range(self.max_length):
-            if all((b.done() for b in beam)):
+            if all((b.done() for b in beam_batch)):
                 break
 
             # (a) Construct batch x beam_size nxt words.
             # Get all the pending current beam words and arrange for forward.
 
-            inp = torch.stack([b.get_current_state() for b in beam])
+            inp = torch.stack([b.current_state for b in beam_batch])
             inp = inp.view(1, -1, 1)
 
             # (b) Decode and forward
@@ -652,18 +653,17 @@ class Translator(object):
             # (c) Advance each beam.
             select_indices_array = []
             # Loop over the batch_size number of beam
-            for j, b in enumerate(beam):
-                b.advance(out[j, :],
-                          beam_attn.data[j, :, :memory_lengths[j]])
+            for j, b in enumerate(beam_batch):
+                b.advance(out[j, :], beam_attn[j, :, :memory_lengths[j]])
                 select_indices_array.append(
-                    b.get_current_origin() + j * beam_size)
+                    b.current_origin + j * beam_size)
             select_indices = torch.cat(select_indices_array)
 
             self.model.decoder.map_state(
                 lambda state, dim: state.index_select(dim, select_indices))
 
         # (4) Extract sentences from beam.
-        for b in beam:
+        for b in beam_batch:
             n_best = self.n_best
             scores, ks = b.sort_finished(minimum=n_best)
             hyps, attn = [], []
@@ -675,15 +675,20 @@ class Translator(object):
             results["scores"].append(scores)
             results["attention"].append(attn)
 
+            # b.all_scores is a list. The elements in it are tensors of size
+            # beam, with scores in them
+            # all_raw_scores = [torch.exp(t) for t in b.all_scores[1:]]
+            # print([t.sum().item() for t in all_raw_scores])
+            # print([t.gt(0).sum().item() for t in all_raw_scores])
             if self.beam_accum is not None:
-                self.beam_accum["beam_parent_ids"].append(
-                    [t.tolist() for t in b.prev_ks])
-                self.beam_accum["scores"].append([
-                    ["%4f" % s for s in t.tolist()]
-                    for t in b.all_scores][1:])
-                self.beam_accum["predicted_ids"].append(
-                    [[vocab.itos[i] for i in t.tolist()]
-                     for t in b.next_ys][1:])
+                parent_ids = [t.tolist() for t in b.prev_ks]
+                self.beam_accum["beam_parent_ids"].append(parent_ids)
+                scores = [["%4f" % s for s in t.tolist()]
+                          for t in b.all_scores][1:]
+                self.beam_accum["scores"].append(scores)
+                pred_ids = [[vocab.itos[i] for i in t.tolist()]
+                            for t in b.next_ys][1:]
+                self.beam_accum["predicted_ids"].append(pred_ids)
 
         return results
 
