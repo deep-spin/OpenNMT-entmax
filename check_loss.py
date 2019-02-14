@@ -9,16 +9,12 @@ from onmt.modules.sparse_losses import (
 )
 
 from onmt.modules.sparse_losses_vlad import (
-    SparsemaxVladLoss,
-    Tsallis15VladLoss,
-)
-
-from onmt.modules.root_finding import (
+    SparsemaxLoss as SparsemaxVladLoss,
+    Tsallis15Loss as Tsallis15VladLoss,
     sparsemax_bisect_loss,
     SparsemaxBisectLoss,
     TsallisBisectLoss,
 )
-
 
 if __name__ == '__main__':
     x = torch.load('test_input.pt', map_location='cpu')

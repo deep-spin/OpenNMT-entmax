@@ -2,10 +2,12 @@ import torch
 from torch.autograd import gradcheck, grad
 
 from onmt.modules.sparse_losses_vlad import (
-    sparsemax_vlad_loss,
-    tsallis15_vlad_loss,
-    SparsemaxVladLoss,
-    Tsallis15VladLoss
+    SparsemaxLoss as SparsemaxVladLoss,
+    Tsallis15Loss as Tsallis15VladLoss,
+    sparsemax_loss as sparsemax_vlad_loss,
+    tsallis15_loss as tsallis15_vlad_loss,
+    SparsemaxBisectLoss,
+    TsallisBisectLoss,
 )
 
 from onmt.modules.sparse_losses import SparsemaxLoss, Tsallis15Loss
@@ -17,8 +19,29 @@ def test_sparsemax_loss():
 
         x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
         _, y = torch.max(torch.randn_like(x), dim=1)
+        gradcheck(sparsemax_vlad_loss, (x, y), eps=1e-5)
 
-        print(gradcheck(sparsemax_vlad_loss, (x, y), eps=1e-5))
+
+def test_sparsemax_bisect_loss():
+
+    sb = SparsemaxBisectLoss(n_iter=50)
+
+    for _ in range(10):
+
+        x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
+        _, y = torch.max(torch.randn_like(x), dim=1)
+        gradcheck(sb, (x, y), eps=1e-5)
+
+
+def test_tsallis_bisect_loss(alpha=1.5):
+
+    ts = TsallisBisectLoss(alpha=alpha, n_iter=50)
+
+    for _ in range(10):
+
+        x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
+        _, y = torch.max(torch.randn_like(x), dim=1)
+        gradcheck(ts, (x, y), eps=1e-5)
 
 
 def test_tsallis_loss():
@@ -27,8 +50,7 @@ def test_tsallis_loss():
 
         x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
         _, y = torch.max(torch.randn_like(x), dim=1)
-
-        print(gradcheck(tsallis15_vlad_loss, (x, y), eps=1e-5))
+        gradcheck(tsallis15_vlad_loss, (x, y), eps=1e-5)
 
 
 def test_builtin_sparsemax_loss():
@@ -90,6 +112,8 @@ def test_builtin_tsallis_loss():
 if __name__ == '__main__':
     test_sparsemax_loss()
     test_tsallis_loss()
+    test_sparsemax_bisect_loss()
+    test_tsallis_bisect_loss()
 
     print("human test, sparsemax")
     test_builtin_sparsemax_loss()
