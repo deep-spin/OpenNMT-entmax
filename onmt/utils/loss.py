@@ -39,7 +39,7 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
     elif isinstance(model.generator[1], LogSparsemax):
         criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
     elif isinstance(model.generator[1], LogTsallis15):
-        criterion = Tsallis15Loss(ignore_index=padding_idx, weights='sum')
+        criterion = Tsallis15Loss(ignore_index=padding_idx, reduction='sum')
     else:
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
 
