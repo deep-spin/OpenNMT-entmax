@@ -16,10 +16,10 @@ class SparsemaxVladLossFunction(Function):
         """
         assert_equal(input.shape[0], target.shape[0])
 
+        # p_star = sparsemax(input.clone(), 1)
         p_star = sparsemax(input.clone(), 1)
 
-        loss = -(p_star ** 2).sum(dim=1)
-        loss += 1
+        loss = 1 - (p_star ** 2).sum(dim=1)
         loss /= 2
 
         p_star.scatter_add_(1, target.unsqueeze(1),
@@ -35,7 +35,7 @@ class SparsemaxVladLossFunction(Function):
     def backward(ctx, grad_output):
         p_star, = ctx.saved_tensors
         grad = grad_output.unsqueeze(1) * p_star
-        return grad, None, None, None
+        return grad, None
 
 
 class Tsallis15VladLossFunction(Function):
@@ -50,8 +50,7 @@ class Tsallis15VladLossFunction(Function):
 
         p_star = tsallis15(input.clone(), 1)
 
-        loss = -(p_star * torch.sqrt(p_star)).sum(dim=1)
-        loss += 1
+        loss = 1 - (p_star * torch.sqrt(p_star)).sum(dim=1)
         loss *= 4 / 3
 
         p_star.scatter_add_(1, target.unsqueeze(1),
@@ -67,7 +66,7 @@ class Tsallis15VladLossFunction(Function):
     def backward(ctx, grad_output):
         p_star, = ctx.saved_tensors
         grad = grad_output.unsqueeze(1) * p_star
-        return grad, None, None, None
+        return grad, None
 
 
 sparsemax_vlad_loss = SparsemaxVladLossFunction.apply

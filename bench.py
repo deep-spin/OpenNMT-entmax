@@ -3,6 +3,7 @@ import numpy as np
 import torch
 
 from onmt.modules.sparse_activations import Sparsemax, Tsallis15
+from onmt.modules.sparse_losses import sparsemax_loss
 from onmt.modules.sparse_losses_vlad import (
         sparsemax_vlad_loss,
         tsallis15_vlad_loss,
@@ -66,6 +67,9 @@ if __name__ == '__main__':
     def _sparsemax_bisect():
         return sparsemax_bisect(x, 10)
 
+    def _sparsemax_loss_old():
+        return sparsemax_loss(x, y)
+
     def _sparsemax_loss():
         return sparsemax_vlad_loss(x, y)
 
@@ -92,6 +96,12 @@ if __name__ == '__main__':
 
         return sp(x, y)
 
+    #p = _sparsemax() > 0
+    # print((p.sum(1) < 200).sum())
+    # p = _tsallis() > 0
+    # print((p.sum(1) < 200).sum())
+    # exit()
+
     print("tsallis accuracy", torch.max((_tsallis_bisect() - _tsallis()) ** 2))
     print("sparsemax accuracy", torch.max((_sparsemax_bisect() - _sparsemax()) ** 2))
 
@@ -107,28 +117,31 @@ if __name__ == '__main__':
     softmax_timings = bench(_softmax)
     print("softmax   ", np.percentile(softmax_timings, [25, 50, 75]))
 
-    sparsemax_timings = bench(_sparsemax)
-    print("sparsemax ", np.percentile(sparsemax_timings, [25, 50, 75]))
-
-    sparsemax_b_timings = bench(_sparsemax_bisect)
-    print("bisect a=2", np.percentile(sparsemax_b_timings, [25, 50, 75]))
-
-    tsallis_timings = bench(_tsallis)
-    print("tsallis15 ", np.percentile(tsallis_timings, [25, 50, 75]))
-
-    tsallis_b_timings = bench(_tsallis_bisect)
-    print("bis a=1.5 ", np.percentile(tsallis_b_timings, [25, 50, 75]))
+#     sparsemax_timings = bench(_sparsemax)
+#     print("sparsemax ", np.percentile(sparsemax_timings, [25, 50, 75]))
+#
+#     sparsemax_b_timings = bench(_sparsemax_bisect)
+#     print("bisect a=2", np.percentile(sparsemax_b_timings, [25, 50, 75]))
+#
+#     tsallis_timings = bench(_tsallis)
+#     print("tsallis15 ", np.percentile(tsallis_timings, [25, 50, 75]))
+#
+#     tsallis_b_timings = bench(_tsallis_bisect)
+#     print("bis a=1.5 ", np.percentile(tsallis_b_timings, [25, 50, 75]))
 
     sp_loss_timings = bench(_sparsemax_loss)
     print("loss   a=2", np.percentile(sp_loss_timings, [25, 50, 75]))
 
-    sp_loss_timings = bench(_sparsemax_bisect_loss)
-    print("ls bis a=2", np.percentile(sp_loss_timings, [25, 50, 75]))
+    sp_loss_timings = bench(_sparsemax_loss_old)
+    print("loss   a=2", np.percentile(sp_loss_timings, [25, 50, 75]))
 
-    ts_loss_timings = bench(_tsallis_loss)
-    print("loss a=1.5", np.percentile(ts_loss_timings, [25, 50, 75]))
-
-    ts_loss_timings = bench(_tsallis_bisect_loss)
-    print("lsbs a=1.5", np.percentile(ts_loss_timings, [25, 50, 75]))
+#     sp_loss_timings = bench(_sparsemax_bisect_loss)
+#     print("ls bis a=2", np.percentile(sp_loss_timings, [25, 50, 75]))
+#
+#     ts_loss_timings = bench(_tsallis_loss)
+#     print("loss a=1.5", np.percentile(ts_loss_timings, [25, 50, 75]))
+#
+#     ts_loss_timings = bench(_tsallis_bisect_loss)
+#     print("lsbs a=1.5", np.percentile(ts_loss_timings, [25, 50, 75]))
 
 
