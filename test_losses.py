@@ -1,63 +1,56 @@
 import pytest
 import torch
 from torch.autograd import gradcheck, grad
+from functools import partial
 
 from onmt.modules.sparse_losses import (
-    sparsemax_loss,
-    tsallis15_loss,
     SparsemaxLoss,
+    SparsemaxTopKLoss,
     Tsallis15Loss,
+    Tsallis15TopKLoss,
     SparsemaxBisectLoss,
     TsallisBisectLoss,
 )
 
 
-def test_sparsemax_loss():
+# make data
+Xs = [torch.randn(4, 10, dtype=torch.float64, requires_grad=True)
+        for _ in range(10)]
 
-    for _ in range(10):
-
-        x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
-        _, y = torch.max(torch.randn_like(x), dim=1)
-        gradcheck(sparsemax_loss, (x, y), eps=1e-5)
+ys = [torch.max(torch.randn_like(X), dim=1)[1] for X in Xs]
 
 
-def test_sparsemax_bisect_loss():
-
-    sb = SparsemaxBisectLoss(n_iter=50)
-
-    for _ in range(10):
-
-        x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
-        _, y = torch.max(torch.randn_like(x), dim=1)
-        gradcheck(sb, (x, y), eps=1e-5)
-
-
-@pytest.mark.parametrize('alpha', (1.2, 1.5, 1.75))
-def test_tsallis_bisect_loss(alpha):
-
-    ts = TsallisBisectLoss(alpha=alpha, n_iter=50)
-
-    for _ in range(10):
-
-        x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
-        _, y = torch.max(torch.randn_like(x), dim=1)
-        gradcheck(ts, (x, y), eps=1e-5)
-
-
-def test_tsallis_loss():
-
-    for _ in range(10):
-
-        x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
-        _, y = torch.max(torch.randn_like(x), dim=1)
-        gradcheck(tsallis15_loss, (x, y), eps=1e-5)
-
-
-@pytest.mark.parametrize('Loss', (
+losses = [
     SparsemaxLoss,
+    partial(SparsemaxTopKLoss, k=5),
     Tsallis15Loss,
+    partial(Tsallis15TopKLoss, k=5),
     SparsemaxBisectLoss,
-    TsallisBisectLoss))
+    TsallisBisectLoss,
+]
+
+
+@pytest.mark.parametrize('Loss', losses)
+def test_non_neg(Loss):
+
+    for X, y in zip(Xs, ys):
+        ls = Loss(reduction='none')
+        lval = ls(X, y)
+        assert torch.all(lval >= 0)
+
+
+@pytest.mark.parametrize('Loss', losses)
+@pytest.mark.parametrize('ignore_index', (False, True))
+@pytest.mark.parametrize('reduction', ('sum', 'elementwise_mean'))
+def test_loss(Loss, ignore_index, reduction):
+
+    for X, y in zip(Xs, ys):
+        iix = y[0] if ignore_index else -100
+        ls = Loss(ignore_index=iix, reduction=reduction)
+        gradcheck(ls, (X, y), eps=1e-5)
+
+
+@pytest.mark.parametrize('Loss', losses)
 def test_index_ignored(Loss):
 
     x = torch.randn(20, 6, dtype=torch.float64, requires_grad=True)
@@ -67,8 +60,6 @@ def test_index_ignored(Loss):
     loss_noignore = Loss(reduction='sum', ignore_index=-100)
 
     assert loss_ignore(x, y) < loss_noignore(x, y)
-    gradcheck(loss_ignore, (x, y), eps=1e-5)
-    gradcheck(loss_noignore, (x, y), eps=1e-5)
 
 
 if __name__ == '__main__':

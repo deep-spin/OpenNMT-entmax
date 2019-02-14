@@ -35,7 +35,7 @@ def test_sparsemax_grad():
     for _ in range(10):
 
         x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
-        print(gradcheck(sparsemax_bisect, (x,), eps=1e-5))
+        gradcheck(sparsemax_bisect, (x,), eps=1e-5)
 
 
 @pytest.mark.parametrize('alpha', (1.2, 1.5, 1.75))
@@ -46,4 +46,4 @@ def test_tsallis_grad(alpha):
         x = torch.randn(4, 6, dtype=torch.float64, requires_grad=True)
         _, y = torch.max(torch.randn_like(x), dim=1)
 
-        print(gradcheck(tsallis_bisect, (x, alpha), eps=1e-5))
+        gradcheck(tsallis_bisect, (x, alpha), eps=1e-5)
