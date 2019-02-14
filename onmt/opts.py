@@ -150,7 +150,13 @@ def model_opts(parser):
               choices=["softmax", "sparsemax", "tsallis15"],
               help="""Which function to use for generating
               probabilities over the target vocabulary (choices:
-              softmax, sparsemax)""")
+              softmax, sparsemax, tsallis)""")
+    group.add('--ts_alpha', '-ts_alpha', type=float, default=1.5,
+              help="")
+    group.add('--bisect_iter', '-bisect_iter', type=int, default=0,
+              help="Bisection iterations for sparsemax or tsallis loss")
+    group.add('--k', '-k', type=int, default=0,
+              help="Top-k to use for speeding up sparsemax or tsallis1.5 loss")
     group.add('--copy_attn_force', '-copy_attn_force', action="store_true",
               help='When available, train to copy.')
     group.add('--reuse_copy_attn', '-reuse_copy_attn', action="store_true",
