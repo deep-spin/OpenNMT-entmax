@@ -19,7 +19,7 @@ from onmt.modules.sparse_losses import (
     SparsemaxBisectLoss,
     TsallisBisectLoss)
 
-from onmt.modules.sparse_activations import LogSparsemax, LogTsallis15
+from onmt.modules.sparse_activations import LogSparsemax
 
 
 def build_loss_compute(model, tgt_vocab, opt, train=True):
@@ -45,21 +45,33 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
         criterion = LabelSmoothingLoss(
             opt.label_smoothing, len(tgt_vocab), ignore_index=padding_idx
         )
-    elif isinstance(model.generator[1], LogSparsemax):
-        # criterion = SparsemaxBisectLoss(n_iter=50, ignore_index=padding_idx, reduction='sum')
-        criterion = SparsemaxTopKLoss(k=100, ignore_index=padding_idx, reduction='sum')
-        # criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
-    elif isinstance(model.generator[1], LogTsallis15):
-        # criterion = TsallisBisectLoss(alpha=1.75, n_iter=10, ignore_index=padding_idx, reduction='sum')
-        criterion = Tsallis15TopKLoss(k=100, ignore_index=padding_idx, reduction='sum')
-        # criterion = Tsallis15Loss(ignore_index=padding_idx, reduction='sum')
-    else:
+    elif isinstance(model.generator[1], nn.LogSoftmax):
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
+    else:
+        # the innovations! at this point, we know it's sparsemax or tsallis
+        # not handled yet: alpha values besides 1.5
+        assert opt.ts_alpha == 1.5, \
+            "Hold your horses, the other alphas aren't ready"
+        assert opt.k == 0 or opt.bisect_iter == 0, \
+            "Bisection and topk are mutually exclusive !"
+
+        use_spm = isinstance(model.generator[1], LogSparsemax)
+        if opt.k > 0:
+            loss_class = SparsemaxTopKLoss if use_spm else Tsallis15TopKLoss
+            criterion = loss_class(
+                k=opt.k, ignore_index=padding_idx, reduction='sum')
+        elif opt.bisect_iter > 0:
+            loss_class = SparsemaxBisectLoss if use_spm else TsallisBisectLoss
+            criterion = loss_class(
+                n_iter=opt.bisect_iter, ignore_index=padding_idx,
+                reduction='sum')
+        else:
+            loss_class = SparsemaxLoss if use_spm else Tsallis15Loss
+            criterion = loss_class(ignore_index=padding_idx, reduction='sum')
 
     # if the loss function operates on vectors of raw logits instead of
     # probabilities, only the first part of the generator needs to be
-    # passed to the NMTLossCompute. At the moment, the only supported
-    # loss function of this kind is the sparsemax loss.
+    # passed to the NMTLossCompute.
 
     criterion_name = str(type(criterion))
     use_raw_logits = 'NLLLoss' not in criterion_name
