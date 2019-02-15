@@ -44,8 +44,6 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
             ignore_index=padding_idx, reduction='sum')
     else:
         # the innovations! at this point, we know it's sparsemax or tsallis
-        assert opt.ts_alpha == 1.5, \
-            "Hold your horses, the other alphas aren't ready"
         assert opt.k == 0 or opt.bisect_iter == 0, \
             "Bisection and topk are mutually exclusive !"
 

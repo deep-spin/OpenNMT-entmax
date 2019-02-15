@@ -151,7 +151,7 @@ def model_opts(parser):
               help="""Which function to use for generating
               probabilities over the target vocabulary (choices:
               softmax, sparsemax, tsallis)""")
-    group.add('--ts_alpha', '-ts_alpha', type=float, default=1.5,
+    group.add('--loss_alpha', '-loss_alpha', type=float, default=1.5,
               help="")
     group.add('--bisect_iter', '-bisect_iter', type=int, default=0,
               help="Bisection iterations for sparsemax or tsallis loss")
