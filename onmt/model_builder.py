@@ -218,6 +218,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
     device = torch.device("cuda" if gpu else "cpu")
     model = onmt.models.NMTModel(encoder, decoder)
 
+    # TODO: use the generator_function only as a shortcut for the alpha
+    # values, use those and bisection and topk to decide what the generator
+    # is. (so as to allow generators with other alpha values to be created)
     # Build Generator.
     if model_opt.generator_function == "sparsemax":
         gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
@@ -278,7 +281,6 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
 def build_model(model_opt, opt, fields, checkpoint):
     """ Build the Model """
     logger.info('Building model...')
-    model = build_base_model(model_opt, fields,
-                             use_gpu(opt), checkpoint)
+    model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint)
     logger.info(model)
     return model
