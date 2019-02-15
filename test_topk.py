@@ -69,7 +69,13 @@ def check_speed():
     import sys
     # device = 'cpu'
     device = 'cuda'
+
     vocab_size = int(sys.argv[1]) if len(sys.argv) > 1 else 32000
+    k = int(sys.argv[2]) if len(sys.argv) > 2 else 500
+    n_iter = int(sys.argv[3]) if len(sys.argv) > 3 else 10
+
+    print("vocab={} k={} n_iter={}".format(vocab_size, k, n_iter))
+
     x = torch.randn(1024, vocab_size, device=device)
     _, y = torch.max(torch.randn_like(x), dim=1)
     ix = y[0]
