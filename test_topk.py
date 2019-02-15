@@ -66,33 +66,41 @@ def _bench(f):
 
 
 def check_speed():
+    import sys
     # device = 'cpu'
     device = 'cuda'
-    x = torch.randn(1024, 32000, device=device)
+    vocab_size = int(sys.argv[1]) if len(sys.argv) > 1 else 32000
+    x = torch.randn(1024, vocab_size, device=device)
     _, y = torch.max(torch.randn_like(x), dim=1)
     ix = y[0]
 
     args = dict(reduction='sum', ignore_index=ix)
 
+    from onmt.modules.sparse_losses import (
+        SparsemaxBisectLoss,
+        TsallisBisectLoss,
+    )
+
     sp1 = partial(SparsemaxLoss(**args), input=x, target=y)
     sp2 = partial(SparsemaxTopKLoss(k=500, **args), input=x, target=y)
+    sp3 = partial(SparsemaxBisectLoss(n_iter=10, **args), input=x, target=y)
     ts1 = partial(Tsallis15Loss(**args), input=x, target=y)
     ts2 = partial(Tsallis15TopKLoss(k=500, **args), input=x, target=y)
-    # sp1 = partial(_threshold_and_support, input=x, dim=1)
-    # sp2 = partial(_threshold_and_support_topk, input=x, dim=1, k=500)
-
-#    ts1 = partial(_tsallis_threshold_and_support, input=x, dim=1)
-#    ts2 = partial(_tsallis_threshold_and_support_topk, input=x, dim=1, k=5000)
+    ts3 = partial(TsallisBisectLoss(alpha=1.5, n_iter=10, **args), input=x, target=y)
 
     torch.cuda.synchronize()
     torch.cuda.synchronize()
     print("sparsemax topk", _bench(sp2))
     print("sparsemax full", _bench(sp1))
+    print("sparsemax bis ", _bench(sp3))
     print("tsallis15 topk", _bench(ts2))
     print("tsallis15 full", _bench(ts1))
+    print("tsallis15 bis ", _bench(ts3))
 
     print(((sp1() - sp2()) ** 2).sum())
+    print(((sp1() - sp3()) ** 2).sum())
     print(((ts1() - ts2()) ** 2).sum())
+    print(((ts1() - ts3()) ** 2).sum())
 
 
 if __name__ == '__main__':
