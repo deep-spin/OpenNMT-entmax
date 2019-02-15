@@ -88,11 +88,11 @@ def check_speed():
     )
 
     sp1 = partial(SparsemaxLoss(**args), input=x, target=y)
-    sp2 = partial(SparsemaxTopKLoss(k=500, **args), input=x, target=y)
-    sp3 = partial(SparsemaxBisectLoss(n_iter=10, **args), input=x, target=y)
+    sp2 = partial(SparsemaxTopKLoss(k=k, **args), input=x, target=y)
+    sp3 = partial(SparsemaxBisectLoss(n_iter=n_iter, **args), input=x, target=y)
     ts1 = partial(Tsallis15Loss(**args), input=x, target=y)
-    ts2 = partial(Tsallis15TopKLoss(k=500, **args), input=x, target=y)
-    ts3 = partial(TsallisBisectLoss(alpha=1.5, n_iter=10, **args), input=x, target=y)
+    ts2 = partial(Tsallis15TopKLoss(k=k, **args), input=x, target=y)
+    ts3 = partial(TsallisBisectLoss(alpha=1.5, n_iter=n_iter, **args), input=x, target=y)
 
     torch.cuda.synchronize()
     torch.cuda.synchronize()
