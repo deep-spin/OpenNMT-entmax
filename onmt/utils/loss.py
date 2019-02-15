@@ -40,10 +40,10 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
     # let's not use model.generator here. we don't need it if we have
     # opt.generator_function
     if opt.generator_function == 'softmax':
-        criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
+        criterion = nn.CrossEntropyLoss(
+            ignore_index=padding_idx, reduction='sum')
     else:
         # the innovations! at this point, we know it's sparsemax or tsallis
-        # not handled yet: alpha values besides 1.5
         assert opt.ts_alpha == 1.5, \
             "Hold your horses, the other alphas aren't ready"
         assert opt.k == 0 or opt.bisect_iter == 0, \
@@ -63,23 +63,13 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
             loss_class = SparsemaxLoss if use_spm else Tsallis15Loss
             criterion = loss_class(ignore_index=padding_idx, reduction='sum')
 
-    # if the loss function operates on vectors of raw logits instead of
-    # probabilities, only the first part of the generator needs to be
-    # passed to the NMTLossCompute.
-
     criterion_name = str(type(criterion))
+    # now all loss functions operate on raw logits
     use_raw_logits = 'NLLLoss' not in criterion_name
     logger.info("Criterion: {}".format(criterion_name))
     logger.info("Use raw logits: {}".format(use_raw_logits))
 
-    # would be great to get rid of this too
-    loss_gen = model.generator[0] if use_raw_logits else model.generator
-    if opt.copy_attn:
-        compute = onmt.modules.CopyGeneratorLossCompute(
-            criterion, loss_gen, tgt_vocab, opt.copy_loss_by_seqlength
-        )
-    else:
-        compute = NMTLossCompute(criterion, loss_gen)
+    compute = NMTLossCompute(criterion, model.generator[0])
     compute.to(device)
 
     return compute
