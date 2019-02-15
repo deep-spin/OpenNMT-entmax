@@ -219,22 +219,18 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
     model = onmt.models.NMTModel(encoder, decoder)
 
     # Build Generator.
-    if not model_opt.copy_attn:
-        if model_opt.generator_function == "sparsemax":
-            gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
-        elif model_opt.generator_function == "tsallis15":
-            gen_func = onmt.modules.sparse_activations.LogTsallis15(dim=-1)
-        else:
-            gen_func = nn.LogSoftmax(dim=-1)
-        generator = nn.Sequential(
-            nn.Linear(model_opt.dec_rnn_size, len(fields["tgt"].vocab)),
-            gen_func
-        )
-        if model_opt.share_decoder_embeddings:
-            generator[0].weight = decoder.embeddings.word_lut.weight
+    if model_opt.generator_function == "sparsemax":
+        gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
+    elif model_opt.generator_function == "tsallis15":
+        gen_func = onmt.modules.sparse_activations.LogTsallis15(dim=-1)
     else:
-        generator = CopyGenerator(model_opt.dec_rnn_size,
-                                  fields["tgt"].vocab)
+        gen_func = nn.LogSoftmax(dim=-1)
+    generator = nn.Sequential(
+        nn.Linear(model_opt.dec_rnn_size, len(fields["tgt"].vocab)),
+        gen_func
+    )
+    if model_opt.share_decoder_embeddings:
+        generator[0].weight = decoder.embeddings.word_lut.weight
 
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:

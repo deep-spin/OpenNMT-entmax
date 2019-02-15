@@ -36,16 +36,10 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
     device = torch.device("cuda" if onmt.utils.misc.use_gpu(opt) else "cpu")
 
     padding_idx = tgt_vocab.stoi[inputters.PAD_WORD]
-    if opt.copy_attn:
-        criterion = onmt.modules.CopyGeneratorLoss(
-            len(tgt_vocab), opt.copy_attn_force,
-            unk_index=inputters.UNK, ignore_index=padding_idx
-        )
-    elif opt.label_smoothing > 0 and train:
-        criterion = LabelSmoothingLoss(
-            opt.label_smoothing, len(tgt_vocab), ignore_index=padding_idx
-        )
-    elif isinstance(model.generator[1], nn.LogSoftmax):
+
+    # let's not use model.generator here. we don't need it if we have
+    # opt.generator_function
+    if opt.generator_function == 'softmax':
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
     else:
         # the innovations! at this point, we know it's sparsemax or tsallis
@@ -55,7 +49,7 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
         assert opt.k == 0 or opt.bisect_iter == 0, \
             "Bisection and topk are mutually exclusive !"
 
-        use_spm = isinstance(model.generator[1], LogSparsemax)
+        use_spm = opt.generator_function == 'sparsemax'
         if opt.k > 0:
             loss_class = SparsemaxTopKLoss if use_spm else Tsallis15TopKLoss
             criterion = loss_class(
@@ -78,6 +72,7 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
     logger.info("Criterion: {}".format(criterion_name))
     logger.info("Use raw logits: {}".format(use_raw_logits))
 
+    # would be great to get rid of this too
     loss_gen = model.generator[0] if use_raw_logits else model.generator
     if opt.copy_attn:
         compute = onmt.modules.CopyGeneratorLossCompute(
