@@ -8,6 +8,7 @@ By Ben Peters and Vlad Niculae
 import torch
 from torch.autograd import Function
 import torch.nn as nn
+from onmt.modules.root_finding import tsallis_bisect, sparsemax_bisect
 
 
 def _make_ix_like(input, dim=0):
@@ -329,3 +330,22 @@ class LogTsallis15TopK(torch.nn.Module):
 
     def forward(self, X):
         return torch.log(tsallis15_topk(X, self.dim, self.k))
+
+
+class LogTsallisBisect(nn.Module):
+    def __init__(self, alpha=1.5, n_iter=50):
+        self.alpha = alpha
+        self.n_iter = n_iter
+        super(LogTsallisBisect, self).__init__()
+
+    def forward(self, X):
+        return torch.log(tsallis_bisect(X, self.alpha, self.n_iter))
+
+
+class LogSparsemaxBisect(nn.Module):
+    def __init__(self, n_iter=50):
+        self.n_iter = n_iter
+        super(LogSparsemaxBisect, self).__init__()
+
+    def forward(self, X):
+        return torch.log(sparsemax_bisect(X, self.n_iter))

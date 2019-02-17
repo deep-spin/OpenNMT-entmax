@@ -20,7 +20,7 @@ from onmt.decoders.decoder import InputFeedRNNDecoder, StdRNNDecoder
 from onmt.decoders.transformer import TransformerDecoder
 from onmt.decoders.cnn_decoder import CNNDecoder
 
-from onmt.modules import Embeddings, CopyGenerator
+from onmt.modules import Embeddings
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 
@@ -140,6 +140,38 @@ def load_test_model(opt, dummy_opt, model_path=None):
         if arg not in model_opt:
             model_opt.__dict__[arg] = dummy_opt[arg]
     model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint)
+
+    # now build the generator
+    alpha_lookup = {'softmax': 1.0, 'tsallis15': 1.5, 'sparsemax': 2.0}
+    gen_alpha = alpha_lookup.get(model_opt.generator_function,
+                                 model_opt.loss_alpha)
+    if gen_alpha == 1.0:
+        gen_func = nn.LogSoftmax(dim=-1)
+    elif gen_alpha == 2.0:
+        if opt.k > 0:
+            gen_func = onmt.modules.sparse_activations.LogSparsemaxTopK(dim=-1, k=opt.k)
+        elif opt.bisect_iter > 0:
+            gen_func = onmt.modules.sparse_activations.LogSparsemaxBisect(n_iter=opt.bisect_iter)
+        else:
+            gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
+    elif gen_alpha == 1.5 and opt.bisect_iter == 0:
+        if opt.k > 0:
+            gen_func = onmt.modules.sparse_activations.LogTsallis15TopK(dim=-1, k=opt.k)
+        else:
+            gen_func = onmt.modules.sparse_activations.LogTsallis15(dim=-1)
+    else:
+        # generic tsallis with bisection
+        assert opt.bisect_iter > 0, "Must use bisection with alpha != 1,1.5,2"
+        gen_func = onmt.modules.sparse_activations.LogTsallisBisect(
+            alpha=gen_alpha, n_iter=opt.bisect_iter)
+
+    gen_weights = model.generator[0] if \
+        isinstance(model.generator, nn.Sequential) else model.generator
+
+    generator = nn.Sequential(gen_weights, gen_func)
+    model.generator = generator
+    print(model.generator)
+
     model.eval()
     model.generator.eval()
     return fields, model, model_opt
@@ -218,18 +250,13 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None):
     device = torch.device("cuda" if gpu else "cpu")
     model = onmt.models.NMTModel(encoder, decoder)
 
-    # TODO: use the generator_function only as a shortcut for the alpha
-    # values, use those and bisection and topk to decide what the generator
-    # is. (so as to allow generators with other alpha values to be created)
-    # Build Generator.
-    if model_opt.generator_function == "sparsemax":
-        gen_func = onmt.modules.sparse_activations.LogSparsemax(dim=-1)
-    elif model_opt.generator_function == "tsallis15":
-        gen_func = onmt.modules.sparse_activations.LogTsallis15(dim=-1)
-    else:
-        gen_func = nn.LogSoftmax(dim=-1)
+    # The generator function only matters at translation time, so it is not
+    # necessary to create it here anymore. At translation time, the model's
+    # model_opt will still have a value for generator_function or loss_alpha.
+    # This is sufficient to figure out what function to use at translation
+    # time.
     generator = nn.Sequential(
-        nn.Linear(model_opt.dec_rnn_size, len(fields["tgt"].vocab)), gen_func
+        nn.Linear(model_opt.dec_rnn_size, len(fields["tgt"].vocab))
     )
     if model_opt.share_decoder_embeddings:
         generator[0].weight = decoder.embeddings.word_lut.weight

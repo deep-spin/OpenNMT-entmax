@@ -149,6 +149,10 @@ class Translator(object):
             * all_predictions is a list of `batch_size` lists
                 of `n_best` predictions
         """
+        if self.logger:
+            self.logger.info(str(self.model))
+        else:
+            os.write(1, str(self.model).encode('utf-8'))
         assert src_data_iter is not None or src_path is not None
 
         if batch_size is None:

@@ -507,6 +507,8 @@ def translate_opts(parser):
               the log probabilities will be averaged directly.
               Necessary for models whose output layers can assign
               zero probability.""")
+    group.add('--bisect_iter', '-bisect_iter', default=0, type=int)
+    group.add('--k', '-k', default=0, type=int)
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",
