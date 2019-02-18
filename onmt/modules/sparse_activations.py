@@ -362,16 +362,8 @@ class LogSparsemaxBisect(nn.Module):
         super(LogSparsemaxBisect, self).__init__()
 
     def forward(self, X):
-        squeezed = False
-        if X.dim() > 2:
-            assert X.dim() == 3
-            assert X.size(2) == 1
-            squeezed = True
-            X = X.squeeze(2)
 
         p_star = sparsemax_bisect(X, self.n_iter)
         p_star /= p_star.sum(dim=1).unsqueeze(dim=1)
 
-        if squeezed:
-            p_star = p_star.unsqueeze(2)
         return torch.log(p_star)
