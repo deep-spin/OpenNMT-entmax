@@ -339,7 +339,9 @@ class LogTsallisBisect(nn.Module):
         super(LogTsallisBisect, self).__init__()
 
     def forward(self, X):
-        return torch.log(tsallis_bisect(X, self.alpha, self.n_iter))
+        p_star =  tsallis_bisect(X, self.alpha, self.n_iter)
+        p_star /= p_star.sum(dim=1).unsqueeze(dim=1)
+        return torch.log(p_star)
 
 
 class LogSparsemaxBisect(nn.Module):
@@ -348,4 +350,6 @@ class LogSparsemaxBisect(nn.Module):
         super(LogSparsemaxBisect, self).__init__()
 
     def forward(self, X):
-        return torch.log(sparsemax_bisect(X, self.n_iter))
+        p_star = sparsemax_bisect(X, self.n_iter)
+        p_star /= p_star.sum(dim=1).unsqueeze(dim=1)
+        return torch.log(p_star)
