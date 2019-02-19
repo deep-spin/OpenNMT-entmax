@@ -146,13 +146,15 @@ def model_opts(parser):
     # Generator and loss options.
     group.add('--copy_attn', '-copy_attn', action="store_true",
               help='Train copy attention layer.')
-    group.add('--generator_function', '-generator_function', default="softmax",
+    group.add('--generator_function', '-generator_function', default=None,
               choices=["softmax", "sparsemax", "tsallis15"],
-              help="""Which function to use for generating
-              probabilities over the target vocabulary (choices:
-              softmax, sparsemax, tsallis)""")
-    group.add('--ts_alpha', '-ts_alpha', type=float, default=1.5,
-              help="")
+              help="""Alias for alpha value to be used for generator and
+              loss function. Softmax corresponds to alpha=1, sparsemax to
+              alpha=2, and tsallis=1.5. If passed, this overrides an explicitly
+              specified loss_alpha value. (choices: softmax, sparsemax,
+              tsallis1.5).""")
+    group.add('--loss_alpha', '-loss_alpha', type=float, default=1.0,
+              help="alpha value for tsallis entropy")
     group.add('--bisect_iter', '-bisect_iter', type=int, default=0,
               help="Bisection iterations for sparsemax or tsallis loss")
     group.add('--k', '-k', type=int, default=0,
@@ -505,6 +507,8 @@ def translate_opts(parser):
               the log probabilities will be averaged directly.
               Necessary for models whose output layers can assign
               zero probability.""")
+    group.add('--bisect_iter', '-bisect_iter', default=0, type=int)
+    group.add('--k', '-k', default=0, type=int)
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",
