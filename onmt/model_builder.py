@@ -145,6 +145,8 @@ def load_test_model(opt, dummy_opt, model_path=None):
     alpha_lookup = {'softmax': 1.0, 'tsallis15': 1.5, 'sparsemax': 2.0}
     gen_alpha = alpha_lookup.get(model_opt.generator_function,
                                  model_opt.loss_alpha)
+    assert opt.k == 0 or opt.bisect_iter == 0, \
+        "Bisection and topk are mutually exclusive ! !"
     if gen_alpha == 1.0:
         gen_func = nn.LogSoftmax(dim=-1)
     elif gen_alpha == 2.0:
