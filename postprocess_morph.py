@@ -21,7 +21,7 @@ def make_out(sigmorphon_path, lang_pred, out_path):
             lemma, _, tags = line.strip().split('\t')
             inflection = re.sub(r'\s', '', pred.strip())
             inflection = re.sub(r'<space>', ' ', inflection)
-            out_path.write('\t'.join([lemma, inflection, tags]) + '\n')
+            out_f.write('\t'.join([lemma, inflection, tags]) + '\n')
 
 
 def main():
@@ -35,9 +35,10 @@ def main():
     # group predictions by language
     # keys are language names, values are lists of predictions
     preds = split_predictions(opt.src, opt.tgt)
+    print(preds.keys())
     for lang, pred in preds.items():
-        out_path = join(opt.out_dir, 'lang' + '.pred.out')
-        sig_path = join(opt.sigmorphon_dir, lang + '-covered-test')
+        out_path = join(opt.out_dir, lang + '.pred.out')
+        sig_path = join(opt.sigmorphon_dir, lang + '-test')
         make_out(sig_path, pred, out_path)
 
 
