@@ -68,9 +68,7 @@ def build_loss_compute(model, tgt_vocab, opt, train=True):
 
     criterion_name = str(type(criterion))
     # now all loss functions operate on raw logits
-    use_raw_logits = 'NLLLoss' not in criterion_name
     logger.info("Criterion: {}".format(criterion_name))
-    logger.info("Use raw logits: {}".format(use_raw_logits))
 
     compute = NMTLossCompute(criterion, model.generator[0])
     compute.to(device)
