@@ -167,6 +167,11 @@ def load_test_model(opt, dummy_opt, model_path=None):
         gen_func = onmt.modules.sparse_activations.LogTsallisBisect(
             alpha=gen_alpha, n_iter=opt.bisect_iter)
 
+    # if model.generator is a Sequential, this unpacks the linear layer from
+    # inside it so it can be combined with the translation-time output
+    # function.
+    # In practice model.generator is always an nn.Sequential instance, but
+    # it should work if you just replace it with a linear layer.
     gen_weights = model.generator[0] if \
         isinstance(model.generator, nn.Sequential) else model.generator
 
