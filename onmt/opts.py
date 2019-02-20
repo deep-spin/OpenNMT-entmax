@@ -143,11 +143,11 @@ def model_opts(parser):
     group.add('--global_attention_alpha', '-global_attention_alpha',
               default=None,
               type=float,
-              help="alpha value for entmax attention")
+              help="alpha value for tsallis attention (ignored otherwise)")
     group.add('--global_attention_bisect_iter', '-global_attention_bisect_iter',
               default=0,
               type=int,
-              help="number of bisection iterations for attention")
+              help="bisection iterations for tsallis attention (ignored o.w.)")
     group.add('--self_attn_type', '-self_attn_type',
               type=str, default="scaled-dot",
               help="""Self attention type in Transformer decoder

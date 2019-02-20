@@ -219,7 +219,7 @@ class GlobalAttention(nn.Module):
             align.masked_fill_(1 - mask, -float('inf'))
 
         # normalize attention weights
-        align_vectors = self.attn_map(align.view(batch * target_l,source_l))
+        align_vectors = self.attn_map(align.view(batch * target_l, source_l))
         align_vectors = align_vectors.view(batch, target_l, source_l)
 
         # each context vector c_t is the weighted average
