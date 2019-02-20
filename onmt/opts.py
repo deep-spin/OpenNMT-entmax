@@ -133,7 +133,15 @@ def model_opts(parser):
                        dotprod or general (Luong) or MLP (Bahdanau)""")
     group.add('--global_attention_function', '-global_attention_function',
               type=str, default="softmax",
-              choices=["softmax", "sparsemax", "tsallis15"])
+              choices=["softmax", "sparsemax", "tsallis15", "tsallis"])
+    group.add('--global_attention_alpha', '-global_attention_alpha',
+              default=None,
+              type=float,
+              help="alpha value for entmax attention")
+    group.add('--global_attention_bisect_iter', '-global_attention_bisect_iter',
+              default=0,
+              type=int,
+              help="number of bisection iterations for attention")
     group.add('--self_attn_type', '-self_attn_type',
               type=str, default="scaled-dot",
               help="""Self attention type in Transformer decoder

@@ -93,7 +93,9 @@ class SparsemaxBisectLossFunction(Function):
         assert_equal(input.shape[0], target.shape[0])
 
         p_star = sparsemax_bisect(input, n_iter)
-        p_star /= p_star.sum(dim=1).unsqueeze(dim=1)
+
+        # this is onw done directly in sparsemax_bisect
+        # p_star /= p_star.sum(dim=1).unsqueeze(dim=1)
 
         loss = _omega_sparsemax(p_star)
 
@@ -203,7 +205,9 @@ class TsallisBisectLossFunction(Function):
         assert_equal(input.shape[0], target.shape[0])
 
         p_star = tsallis_bisect(input, alpha, n_iter)
-        p_star /= p_star.sum(dim=1).unsqueeze(dim=1)
+
+        # this is now done directly in tsallis_bisect
+        # p_star /= p_star.sum(dim=1).unsqueeze(dim=1)
 
         loss = _omega_tsallis(p_star, alpha)
 

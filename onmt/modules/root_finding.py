@@ -24,7 +24,7 @@ def _tsallis_p(X,  alpha):
 class SparsemaxBisectFunction(Function):
 
     @staticmethod
-    def forward(ctx, X, n_iter=50):
+    def forward(ctx, X, n_iter=50, ensure_sum_one=True):
 
         ctx.dim = dim = 1
         d = X.shape[dim]
@@ -49,7 +49,11 @@ class SparsemaxBisectFunction(Function):
             mask = (f_m * f_lo >= 0).unsqueeze(dim)
             tau_lo = torch.where(mask, tau_m, tau_lo)
 
+        if ensure_sum_one:
+            p_m /= p_m.sum(dim=1).unsqueeze(dim=1)
+
         ctx.save_for_backward(p_m)
+
         return p_m
 
     @staticmethod
@@ -66,7 +70,7 @@ class SparsemaxBisectFunction(Function):
 class TsallisBisectFunction(Function):
 
     @staticmethod
-    def forward(ctx, X, alpha=1.5, n_iter=50):
+    def forward(ctx, X, alpha=1.5, n_iter=50, ensure_sum_one=True):
 
         ctx.alpha = alpha
         ctx.dim = dim = 1
@@ -96,7 +100,11 @@ class TsallisBisectFunction(Function):
             mask = (f_m * f_lo >= 0).unsqueeze(dim)
             tau_lo = torch.where(mask, tau_m, tau_lo)
 
+        if ensure_sum_one:
+            p_m /= p_m.sum(dim=1).unsqueeze(dim=1)
+
         ctx.save_for_backward(p_m)
+
         return p_m
 
     @staticmethod

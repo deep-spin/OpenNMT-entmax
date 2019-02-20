@@ -3,7 +3,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from onmt.modules.sparse_activations import sparsemax, tsallis15
+from onmt.modules.sparse_activations import (
+    sparsemax,
+    sparsemax_topk,
+    tsallis15,
+    tsallis15_topk)
+
+from onmt.modules.root_finding import tsallis_bisect, sparsemax_bisect
+
 from onmt.utils.misc import aeq, sequence_mask
 
 # This class is mainly used by decoder.py for RNNs but also
@@ -68,16 +75,24 @@ class GlobalAttention(nn.Module):
     """
 
     def __init__(self, dim, coverage=False, attn_type="dot",
-                 attn_func="softmax"):
+                 attn_func="softmax", attn_alpha=None, bisect_iter=0):
         super(GlobalAttention, self).__init__()
 
         self.dim = dim
         assert attn_type in ["dot", "general", "mlp"], (
             "Please select a valid attention type.")
         self.attn_type = attn_type
-        assert attn_func in ["softmax", "sparsemax", "tsallis15"], \
+        assert attn_func in ("softmax", "sparsemax", "tsallis15", "tsallis"), \
             "Please select a valid attention function."
         self.attn_func = attn_func
+
+        self.attn_alpha = attn_alpha
+        self.bisect_iter = bisect_iter
+
+        if attn_func == "tsallis":
+            assert self.attn_alpha is not None
+            if self.attn_alpha not in (1, 1.5, 2):
+                assert self.bisect_iter > 0
 
         if self.attn_type == "general":
             self.linear_in = nn.Linear(dim, dim, bias=False)
@@ -135,6 +150,31 @@ class GlobalAttention(nn.Module):
 
             return self.v(wquh.view(-1, dim)).view(tgt_batch, tgt_len, src_len)
 
+    def attn_map(self, Z):
+        if self.attn_func == "softmax":
+            return F.softmax(Z, -1)
+        elif self.attn_func == "sparsemax":
+            return sparsemax(Z, -1)
+        elif self.attn_func == "tsallis15":
+            return tsallis15(Z, -1)
+        elif self.attn_func == "tsallis":
+
+            if self.bisect_iter == 0:
+                if self.attn_alpha == 1:
+                    return F.softmax(Z, -1)
+                elif self.attn_alpha == 2:
+                    return sparsemax_topk(Z, -1, 8)  # hardcoded k=8
+                elif self.attn_alpha == 1.5:
+                    return tsallis15_topk(Z, -1, 8)  # hardcoded k=8
+
+            else:
+                if self.attn_alpha == 2:
+                    return sparsemax_bisect(Z, self.bisect_iter)
+                else:
+                    return tsallis_bisect(Z, self.attn_alpha, self.bisect_iter)
+
+        raise ValueError("invalid combination of arguments")
+
     def forward(self, source, memory_bank, memory_lengths=None, coverage=None):
         """
 
@@ -182,13 +222,8 @@ class GlobalAttention(nn.Module):
             mask = mask.unsqueeze(1)  # Make it broadcastable.
             align.masked_fill_(1 - mask, -float('inf'))
 
-        # Softmax or sparsemax to normalize attention weights
-        if self.attn_func == "softmax":
-            align_vectors = F.softmax(align.view(batch*target_l, source_l), -1)
-        elif self.attn_func == "sparsemax":
-            align_vectors = sparsemax(align.view(batch*target_l, source_l), -1)
-        else:
-            align_vectors = tsallis15(align.view(batch*target_l, source_l), -1)
+        # normalize attention weights
+        align_vectors = self.attn_map(align.view(batch * target_l,source_l))
         align_vectors = align_vectors.view(batch, target_l, source_l)
 
         # each context vector c_t is the weighted average
