@@ -112,7 +112,9 @@ def build_decoder(opt, embeddings):
                                    opt.copy_attn,
                                    opt.dropout,
                                    embeddings,
-                                   opt.reuse_copy_attn)
+                                   opt.reuse_copy_attn,
+                                   opt.global_attention_alpha,
+                                   opt.global_attention_bisect_iter)
     else:
         return StdRNNDecoder(opt.rnn_type, opt.brnn,
                              opt.dec_layers, opt.dec_rnn_size,
@@ -123,7 +125,9 @@ def build_decoder(opt, embeddings):
                              opt.copy_attn,
                              opt.dropout,
                              embeddings,
-                             opt.reuse_copy_attn)
+                             opt.reuse_copy_attn,
+                             opt.global_attention_alpha,
+                             opt.global_attention_bisect_iter)
 
 
 def load_test_model(opt, dummy_opt, model_path=None):
