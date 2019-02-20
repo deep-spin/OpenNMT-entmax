@@ -133,7 +133,13 @@ def model_opts(parser):
                        dotprod or general (Luong) or MLP (Bahdanau)""")
     group.add('--global_attention_function', '-global_attention_function',
               type=str, default="softmax",
-              choices=["softmax", "sparsemax", "tsallis15", "tsallis"])
+              choices=["softmax", "sparsemax", "tsallis15", "tsallis"],
+              help=("Attention probability mapping to use. If `tsallis`, you "
+                    "must set --global_attention_alpha and "
+                    "--global_attention_bisect_iter. `tsallis` with alpha=1.5 "
+                    "is the same as tsallis15, and with alpha=2 the same as "
+                    "sparsemax, but accessed through a generic bisection-based "
+                    "implementation which may be faster for long sentences."))
     group.add('--global_attention_alpha', '-global_attention_alpha',
               default=None,
               type=float,
