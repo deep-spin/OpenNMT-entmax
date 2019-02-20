@@ -91,8 +91,7 @@ class GlobalAttention(nn.Module):
 
         if attn_func == "tsallis":
             assert self.attn_alpha is not None
-            if self.attn_alpha not in (1, 1.5, 2):
-                assert self.bisect_iter > 0
+            assert self.bisect_iter > 0
 
         if self.attn_type == "general":
             self.linear_in = nn.Linear(dim, dim, bias=False)
@@ -106,6 +105,10 @@ class GlobalAttention(nn.Module):
 
         if coverage:
             self.linear_cover = nn.Linear(1, dim, bias=False)
+
+    def extra_repr(self):
+        keys = ['attn_type', 'attn_func', 'attn_alpha', 'bisect_iter']
+        return ", ".join(f"{k}: {getattr(self, k)}" for k in keys)
 
     def score(self, h_t, h_s):
         """
@@ -153,25 +156,18 @@ class GlobalAttention(nn.Module):
     def attn_map(self, Z):
         if self.attn_func == "softmax":
             return F.softmax(Z, -1)
+
         elif self.attn_func == "sparsemax":
             return sparsemax(Z, -1)
+
         elif self.attn_func == "tsallis15":
             return tsallis15(Z, -1)
+
         elif self.attn_func == "tsallis":
-
-            if self.bisect_iter == 0:
-                if self.attn_alpha == 1:
-                    return F.softmax(Z, -1)
-                elif self.attn_alpha == 2:
-                    return sparsemax_topk(Z, -1, 8)  # hardcoded k=8
-                elif self.attn_alpha == 1.5:
-                    return tsallis15_topk(Z, -1, 8)  # hardcoded k=8
-
+            if self.attn_alpha == 2:  # slightly faster specialized impl
+                return sparsemax_bisect(Z, self.bisect_iter)
             else:
-                if self.attn_alpha == 2:
-                    return sparsemax_bisect(Z, self.bisect_iter)
-                else:
-                    return tsallis_bisect(Z, self.attn_alpha, self.bisect_iter)
+                return tsallis_bisect(Z, self.attn_alpha, self.bisect_iter)
 
         raise ValueError("invalid combination of arguments")
 
