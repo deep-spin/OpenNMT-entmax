@@ -108,7 +108,8 @@ class GlobalAttention(nn.Module):
 
     def extra_repr(self):
         keys = ['attn_type', 'attn_func', 'attn_alpha', 'bisect_iter']
-        return ", ".join(f"{k}: {getattr(self, k)}" for k in keys)
+        values = [getattr(self, k) for k in keys]
+        return ", ".join("{}: {}".format(k, v) for k, v in zip(keys, values))
 
     def score(self, h_t, h_s):
         """
