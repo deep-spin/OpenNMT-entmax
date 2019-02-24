@@ -141,15 +141,15 @@ class Translation(object):
         best_score = self.pred_scores[0]
         pred_sent = ' '.join(best_pred)
         output += 'PRED {}: {}\n'.format(sent_number, pred_sent)
-        output += "PRED SCORE: {:.4f}\n".format(best_score)
+        output += "PRED SCORE: {:.7f}\n".format(best_score)
 
         if self.gold_sent is not None:
             tgt_sent = ' '.join(self.gold_sent)
             output += 'GOLD {}: {}\n'.format(sent_number, tgt_sent)
-            output += ("GOLD SCORE: {:.4f}\n".format(self.gold_score))
+            output += ("GOLD SCORE: {:.7f}\n".format(self.gold_score))
         if len(self.pred_sents) > 1:
             output += '\nBEST HYP:\n'
             for score, sent in zip(self.pred_scores, self.pred_sents):
-                output += "[{:.4f}] {}\n".format(score, sent)
+                output += "[{:.7f}] {}\n".format(score, sent)
 
         return output
