@@ -38,3 +38,18 @@ def test_mask(func, dtype):
 
     assert torch.allclose(y, torch.zeros_like(y))
 
+
+@pytest.mark.parametrize('alpha', (1.25, 1.5, 1.75, 2.25))
+def test_mask_alphas(alpha):
+    torch.manual_seed(42)
+    x = torch.randn(2, 6)
+    x[:, 3:] = -float('inf')
+    x0 = x[:, :3]
+
+    y = tsallis_bisect(x, alpha)
+    y0 = tsallis_bisect(x0, alpha)
+
+    y[:, :3] -= y0
+
+    assert torch.allclose(y, torch.zeros_like(y))
+
