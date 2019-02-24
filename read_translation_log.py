@@ -43,6 +43,17 @@ def parse_log(path):
     return beams_by_lang
 
 
+def beams_to_table(beams):
+    data = defaultdict(list)
+    for k, v in beams.items():
+        data['language'].append(k)
+        data['samples'].append(len(v))
+        data['single hypothesis'].append(totally_sparse_rate(v))
+        data['avg beam probability'].append(avg_beam_prob(v))
+    return pd.DataFrame(data)
+
+
+# this is maybe not exactly what I should do
 def totally_sparse_rate(beams):
     return sum(b[0] == 1 for b in beams) / len(beams)
 
@@ -53,22 +64,13 @@ def avg_beam_prob(beams):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('log')
+    parser.add_argument('-logs', nargs='+')
     opt = parser.parse_args()
-    beams = parse_log(opt.log)
-    print(beams.keys())
-    print(len(beams))
-    data = defaultdict(list)
-    for k, v in beams.items():
-        data['language'].append(k)
-        data['samples'].append(len(v))
-        data['single hypothesis'].append(totally_sparse_rate(v))
-        data['avg beam probability'].append(avg_beam_prob(v))
-    df = pd.DataFrame(data)
-    print(df)
-    print(df.mean())
-    print(df.iloc[df['single hypothesis'].idxmin()])
-    print(df.loc[df['language'] == 'english'])
+    for log in opt.logs:
+        beams = parse_log(log)
+        df = beams_to_table(beams)
+        print(log)
+        print(df.mean())
     #print(len(beams))
     #print(len(set(lang_index)))
     #print(totally_sparse_rate(beams))
