@@ -110,7 +110,9 @@ class TsallisBisectFunction(Function):
     @staticmethod
     def backward(ctx, dY):
         Y, = ctx.saved_tensors
-        gppr = Y ** (2 - ctx.alpha)
+
+        gppr = torch.where(Y > 0, Y ** (2 - ctx.alpha), Y.new_zeros(1))
+
         dX = dY * gppr
         q = dX.sum(ctx.dim) / gppr.sum(ctx.dim)
         q = q.unsqueeze(ctx.dim)
