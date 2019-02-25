@@ -117,7 +117,8 @@ class Translator(object):
         self.beam_score_out = opt.beam_score_out
         self.beam_scores = [] if opt.beam_score_out is not None else None
 
-        self.print_support = opt.print_support
+        self.force_support = opt.force_support
+        self.dec_support = opt.dec_support
 
     def translate(self,
                   src_path=None,
@@ -353,17 +354,32 @@ class Translator(object):
         log_probs = self.model.generator(dec_out.squeeze(0))
 
         tgt_vocab = self.fields['tgt'].vocab
-        if self.print_support and step is None:
+        if self.force_support and step is None:
             # step is none means force decoding
             # and we're just gonna do it in the forced decoding case for now
             assert log_probs.size(1) == 1, "just use batch size 1"
+            
             probs = log_probs.squeeze(1).exp()
-            for tgt_step in probs:
+            input_seq = [tgt_vocab.itos[i] for i in decoder_input.view(-1)]
+            for i, tgt_step in enumerate(probs, 1):
                 supp_ix = tgt_step.nonzero().squeeze(1)
                 supp_probs = tgt_step.index_select(0, supp_ix).tolist()
                 supp_types = [tgt_vocab.itos[i] for i in supp_ix]
                 support = sorted(zip(supp_probs, supp_types), reverse=True)
+                print(input_seq[:i])
                 print(support)
+                print()
+        elif self.dec_support and step is not None:
+            assert log_probs.size(0) == 1, "just use batch and beam size 1"
+            probs = log_probs.squeeze(0).exp()
+            supp_ix = probs.nonzero().squeeze(1)
+            supp_probs = probs.index_select(0, supp_ix).tolist()
+            supp_types = [tgt_vocab.itos[i] for i in supp_ix]
+            support = sorted(zip(supp_probs, supp_types), reverse=True)
+            last_input = [tgt_vocab.itos[i] for i in decoder_input.view(-1)]
+            print(last_input)
+            print(support)
+            print()
         # returns [(batch_size x beam_size) , vocab ] when 1 step
         # or [ tgt_len, batch_size, vocab ] when full sentence
 
