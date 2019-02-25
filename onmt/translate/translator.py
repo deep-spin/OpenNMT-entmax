@@ -5,6 +5,7 @@ import configargparse
 import codecs
 import os
 import math
+from collections import Counter
 
 import torch
 
@@ -115,6 +116,8 @@ class Translator(object):
         self.attn_out = opt.attn_out
         self.beam_score_out = opt.beam_score_out
         self.beam_scores = [] if opt.beam_score_out is not None else None
+
+        self.print_support = opt.print_support
 
     def translate(self,
                   src_path=None,
@@ -335,12 +338,7 @@ class Translator(object):
                              memory_lengths, src_map=None,
                              step=None, batch_offset=None):
 
-        if self.copy_attn:
-            # Turn any copied words to UNKs (index 0).
-            decoder_input = decoder_input.masked_fill(
-                decoder_input.gt(len(self.fields["tgt"].vocab) - 1), 0)
-
-        # Decoder forward, takes [tgt_len, batch, nfeats] as input
+        # Decoder forward takes [tgt_len, batch, nfeats] as input
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
@@ -351,32 +349,23 @@ class Translator(object):
             step=step)
 
         # Generator forward.
-        if not self.copy_attn:
-            attn = dec_attn["std"]
-            log_probs = self.model.generator(dec_out.squeeze(0))
-            # returns [(batch_size x beam_size) , vocab ] when 1 step
-            # or [ tgt_len, batch_size, vocab ] when full sentence
-        else:
-            attn = dec_attn["copy"]
-            scores = self.model.generator(dec_out.view(-1, dec_out.size(2)),
-                                          attn.view(-1, attn.size(2)),
-                                          src_map)
-            # here we have scores [tgt_lenxbatch, vocab] or [beamxbatch, vocab]
-            if batch_offset is None:
-                scores = scores.view(batch.batch_size, -1, scores.size(-1))
-            else:
-                scores = scores.view(-1, self.beam_size, scores.size(-1))
-            scores = data.collapse_copy_scores(
-                scores,
-                batch,
-                self.fields["tgt"].vocab,
-                data.src_vocabs,
-                batch_dim=0,
-                batch_offset=batch_offset)
-            scores = scores.view(decoder_input.size(0), -1, scores.size(-1))
-            log_probs = scores.squeeze(0).log()
-            # returns [(batch_size x beam_size) , vocab ] when 1 step
-            # or [ tgt_len, batch_size, vocab ] when full sentence
+        attn = dec_attn["std"]
+        log_probs = self.model.generator(dec_out.squeeze(0))
+
+        tgt_vocab = self.fields['tgt'].vocab
+        if self.print_support and step is None:
+            # step is none means force decoding
+            # and we're just gonna do it in the forced decoding case for now
+            assert log_probs.size(1) == 1, "just use batch size 1"
+            probs = log_probs.squeeze(1).exp()
+            for tgt_step in probs:
+                supp_ix = tgt_step.nonzero().squeeze(1)
+                supp_probs = tgt_step.index_select(0, supp_ix).tolist()
+                supp_types = [tgt_vocab.itos[i] for i in supp_ix]
+                support = sorted(zip(supp_probs, supp_types), reverse=True)
+                print(support)
+        # returns [(batch_size x beam_size) , vocab ] when 1 step
+        # or [ tgt_len, batch_size, vocab ] when full sentence
 
         return log_probs, attn
 
@@ -413,8 +402,7 @@ class Translator(object):
         results["batch"] = batch
         if "tgt" in batch.__dict__:
             results["gold_score"] = self._score_target(
-                batch, memory_bank, src_lengths, data, batch.src_map
-                if data.data_type == 'text' and self.copy_attn else None)
+                batch, memory_bank, src_lengths, data, None)
             self.model.decoder.init_state(src, memory_bank, enc_states)
         else:
             results["gold_score"] = [0] * batch_size

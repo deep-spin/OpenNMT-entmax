@@ -609,6 +609,7 @@ def translate_opts(parser):
               help='Print best attn for each word')
     group.add('--attn_out', '-attn_out')
     group.add('--beam_score_out', '-beam_score_out')
+    group.add('--print_support', '-print_support', action="store_true")
     group.add('--dump_beam', '-dump_beam', type=str, default="",
               help='File to dump beam information to.')
     group.add('--n_best', '-n_best', type=int, default=1,
