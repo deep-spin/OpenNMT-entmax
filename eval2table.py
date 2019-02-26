@@ -67,12 +67,15 @@ def results_table(path, task, columns):
     return df
 
 
-def setting_results(df):
+def setting_results(df, ensemble=False):
     single_runs = df.loc[df['run'] != 'ensemble']
     singles_avg = single_runs.groupby(['Output', 'Attention']).mean()
-    ensemble_run = df.loc[df['run'] == 'ensemble']
-    ensemble_avg = ensemble_run.groupby(['Output', 'Attention']).mean()
-    return pd.concat([singles_avg, ensemble_avg], axis=1)
+    if ensemble:
+        ensemble_run = df.loc[df['run'] == 'ensemble']
+        ensemble_avg = ensemble_run.groupby(['Output', 'Attention']).mean()
+        return pd.concat([singles_avg, ensemble_avg], axis=1)
+    else:
+        return singles_avg
 
 
 def main():
@@ -85,7 +88,8 @@ def main():
     results = [results_table(path, opt.task, opt.columns)
                for path in opt.results_paths]
 
-    all_results = [setting_results(setting) for setting in results]
+    all_results = [setting_results(setting, opt.task == 'morph')
+                   for setting in results]
     print(pd.concat(all_results, axis=1).to_latex(float_format='%.2f'))
 
 
