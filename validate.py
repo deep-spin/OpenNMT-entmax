@@ -203,8 +203,8 @@ def main(opt):
         logger.info('Validating on CPU, could be very slow')
 
     valid_stats = validator.validate(valid_iter_fct())
-    print('avg. attended positions/tgt word: '.format(valid_stats['attended_pos'] / valid_stats['tgt_words']))
-    print('avg. support size: '.format(valid_stats['support'] / valid_stats['tgt_words']))
+    print('avg. attended positions/tgt word: {}'.format(valid_stats['attended_pos'] / valid_stats['tgt_words']))
+    print('avg. support size: {}'.format(valid_stats['support'] / valid_stats['tgt_words']))
 
 
 if __name__ == "__main__":
