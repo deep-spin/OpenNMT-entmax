@@ -33,7 +33,7 @@ class Validator(object):
             :obj:`nmt.Statistics`: validation loss statistics
         """
         # Set model in validating mode.
-        stats = {'support': 0, 'attended_pos': 0}
+        stats = {'support': 0, 'tgt_words': 0, 'attended_pos': 0}
         # what 
         with torch.no_grad():
             for batch in valid_iter:
@@ -47,18 +47,24 @@ class Validator(object):
                 # outputs is seq x batch x hidden_size
                 bottled_out = outputs.view(-1, outputs.size(-1))
                 generator_out = self.model.generator(bottled_out)
-                #print(generator_out.size())
-                #print(generator_out.gt(0).sum(dim=1).size())
-                # print(self.padding_idx)
-                print()
-                # print(self.model.generator(outputs).size())
+
+                out_support = generator_out.gt(0).sum(dim=1)
+                tgt_non_pad = tgt[1:].ne(self.padding_idx).view(-1)
+                support_non_pad = out_support.masked_select(tgt_non_pad)
+                stats['support'] += support_non_pad.sum().item()
+                stats['tgt_words'] += support_non_pad.size(0)
+
+                attn = attns['std']
+                attn = attn.view(-1, attn.size(-1))
+                attended = attn.ne(0).sum(dim=1)
+                attended_non_pad = attended.masked_select(tgt_non_pad)
+                stats['attended_pos'] += attended_non_pad.sum().item()
 
         return stats
 
 
 def build_validator(opt, model, fields):
     """
-    Simplify `Trainer` creation based on user `opt`s*
 
     Args:
         opt (:obj:`Namespace`): user options (usually from argument parsing)
@@ -72,7 +78,7 @@ def build_validator(opt, model, fields):
     """
     padding_idx = fields['tgt'].vocab.stoi[PAD_WORD]
 
-    return Validator(model, valid_loss, padding_idx)
+    return Validator(model, padding_idx)
 
 
 def training_opt_postprocessing(opt, device_id):
@@ -197,7 +203,8 @@ def main(opt):
         logger.info('Validating on CPU, could be very slow')
 
     valid_stats = validator.validate(valid_iter_fct())
-    print(valid_stats)
+    print('avg. attended positions/tgt word: '.format(valid_stats['attended_pos'] / valid_stats['tgt_words']))
+    print('avg. support size: '.format(valid_stats['support'] / valid_stats['tgt_words']))
 
 
 if __name__ == "__main__":
