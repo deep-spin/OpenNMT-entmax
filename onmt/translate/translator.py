@@ -5,6 +5,7 @@ import configargparse
 import codecs
 import os
 import math
+from collections import Counter
 
 import torch
 
@@ -115,6 +116,9 @@ class Translator(object):
         self.attn_out = opt.attn_out
         self.beam_score_out = opt.beam_score_out
         self.beam_scores = [] if opt.beam_score_out is not None else None
+
+        self.force_support = opt.force_support
+        self.dec_support = opt.dec_support
 
     def translate(self,
                   src_path=None,
@@ -335,12 +339,7 @@ class Translator(object):
                              memory_lengths, src_map=None,
                              step=None, batch_offset=None):
 
-        if self.copy_attn:
-            # Turn any copied words to UNKs (index 0).
-            decoder_input = decoder_input.masked_fill(
-                decoder_input.gt(len(self.fields["tgt"].vocab) - 1), 0)
-
-        # Decoder forward, takes [tgt_len, batch, nfeats] as input
+        # Decoder forward takes [tgt_len, batch, nfeats] as input
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
@@ -351,32 +350,41 @@ class Translator(object):
             step=step)
 
         # Generator forward.
-        if not self.copy_attn:
-            attn = dec_attn["std"]
-            log_probs = self.model.generator(dec_out.squeeze(0))
-            # returns [(batch_size x beam_size) , vocab ] when 1 step
-            # or [ tgt_len, batch_size, vocab ] when full sentence
-        else:
-            attn = dec_attn["copy"]
-            scores = self.model.generator(dec_out.view(-1, dec_out.size(2)),
-                                          attn.view(-1, attn.size(2)),
-                                          src_map)
-            # here we have scores [tgt_lenxbatch, vocab] or [beamxbatch, vocab]
-            if batch_offset is None:
-                scores = scores.view(batch.batch_size, -1, scores.size(-1))
-            else:
-                scores = scores.view(-1, self.beam_size, scores.size(-1))
-            scores = data.collapse_copy_scores(
-                scores,
-                batch,
-                self.fields["tgt"].vocab,
-                data.src_vocabs,
-                batch_dim=0,
-                batch_offset=batch_offset)
-            scores = scores.view(decoder_input.size(0), -1, scores.size(-1))
-            log_probs = scores.squeeze(0).log()
-            # returns [(batch_size x beam_size) , vocab ] when 1 step
-            # or [ tgt_len, batch_size, vocab ] when full sentence
+        attn = dec_attn["std"]
+        log_probs = self.model.generator(dec_out.squeeze(0))
+
+        tgt_vocab = self.fields['tgt'].vocab
+        if self.force_support and step is None:
+            # step is none means force decoding
+            # and we're just gonna do it in the forced decoding case for now
+            assert log_probs.size(1) == 1, "just use batch size 1"
+            
+            probs = log_probs.squeeze(1).exp()
+            input_seq = [tgt_vocab.itos[i] for i in decoder_input.view(-1)] + ['</s>']
+            print('tgt gold sentence:', input_seq)
+            for i, tgt_step in enumerate(probs, 1):
+                supp_ix = tgt_step.nonzero().squeeze(1)
+                supp_probs = tgt_step.index_select(0, supp_ix).tolist()
+                supp_types = [tgt_vocab.itos[i] for i in supp_ix]
+                support = sorted(zip(supp_probs, supp_types), reverse=True)
+                print(input_seq[:i])
+                print(support)
+                print(len(support))
+                print(input_seq[i] in supp_types)
+                print()
+        elif self.dec_support and step is not None:
+            assert log_probs.size(0) == 1, "just use batch and beam size 1"
+            probs = log_probs.squeeze(0).exp()
+            supp_ix = probs.nonzero().squeeze(1)
+            supp_probs = probs.index_select(0, supp_ix).tolist()
+            supp_types = [tgt_vocab.itos[i] for i in supp_ix]
+            support = sorted(zip(supp_probs, supp_types), reverse=True)
+            last_input = [tgt_vocab.itos[i] for i in decoder_input.view(-1)]
+            print(last_input)
+            print(support)
+            print()
+        # returns [(batch_size x beam_size) , vocab ] when 1 step
+        # or [ tgt_len, batch_size, vocab ] when full sentence
 
         return log_probs, attn
 
@@ -413,8 +421,7 @@ class Translator(object):
         results["batch"] = batch
         if "tgt" in batch.__dict__:
             results["gold_score"] = self._score_target(
-                batch, memory_bank, src_lengths, data, batch.src_map
-                if data.data_type == 'text' and self.copy_attn else None)
+                batch, memory_bank, src_lengths, data, None)
             self.model.decoder.init_state(src, memory_bank, enc_states)
         else:
             results["gold_score"] = [0] * batch_size
@@ -699,13 +706,30 @@ class Translator(object):
         return results
 
     def _score_target(self, batch, memory_bank, src_lengths, data, src_map):
-        tgt_in = inputters.make_features(batch, 'tgt')[:-1]
+        tgt = inputters.make_features(batch, 'tgt')
+        tgt_in = tgt[:-1]
+        tgt_vocab = self.fields["tgt"].vocab
 
         log_probs, attn = \
             self._decode_and_generate(tgt_in, memory_bank, batch, data,
                                       memory_lengths=src_lengths,
                                       src_map=src_map)
-        tgt_pad = self.fields["tgt"].vocab.stoi[inputters.PAD_WORD]
+        if self.force_support:
+            probs = log_probs.squeeze(1).exp()
+                input_seq = [tgt_vocab.itos[i] for i in decoder_input.view(-1)] + ['</s>']
+                print('tgt gold sentence:', input_seq)
+                for i, tgt_step in enumerate(probs, 1):
+                    supp_ix = tgt_step.nonzero().squeeze(1)
+                    supp_probs = tgt_step.index_select(0, supp_ix).tolist()
+                    supp_types = [tgt_vocab.itos[i] for i in supp_ix]
+                    support = sorted(zip(supp_probs, supp_types), reverse=True)
+                    print(tgt[:i])
+                    print(support)
+                    print(len(support))
+                    print(tgt[i] in supp_types)
+                    print()
+
+        tgt_pad = tgt_vocab.stoi[inputters.PAD_WORD]
 
         log_probs[:, :, tgt_pad] = 0
         gold = batch.tgt[1:].unsqueeze(2)
