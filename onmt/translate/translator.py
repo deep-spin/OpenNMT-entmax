@@ -714,20 +714,6 @@ class Translator(object):
             self._decode_and_generate(tgt_in, memory_bank, batch, data,
                                       memory_lengths=src_lengths,
                                       src_map=src_map)
-        if self.force_support:
-            probs = log_probs.squeeze(1).exp()
-            input_seq = [tgt_vocab.itos[i] for i in tgt_in.view(-1)] + ['</s>']
-            print('tgt gold sentence:', input_seq)
-            for i, tgt_step in enumerate(probs, 1):
-                supp_ix = tgt_step.nonzero().squeeze(1)
-                supp_probs = tgt_step.index_select(0, supp_ix).tolist()
-                supp_types = [tgt_vocab.itos[i] for i in supp_ix]
-                support = sorted(zip(supp_probs, supp_types), reverse=True)
-                print(tgt[:i])
-                print(support)
-                print(len(support))
-                print(tgt[i] in supp_types)
-                print()
 
         tgt_pad = tgt_vocab.stoi[inputters.PAD_WORD]
 
