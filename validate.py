@@ -101,7 +101,7 @@ def load_model(checkpoint, fields, k=0, bisect_iter=0, gpu=False):
     assert opt.k == 0 or opt.bisect_iter == 0, \
         "Bisection and topk are mutually exclusive ! !"
     if gen_alpha == 1.0:
-        gen_func = nn.LogSoftmax(dim=-1)
+        gen_func = nn.Softmax(dim=-1)
     elif gen_alpha == 2.0:
         if k > 0:
             gen_func = onmt.modules.sparse_activations.SparsemaxTopK(dim=-1, k=k)
