@@ -94,6 +94,8 @@ def load_model(checkpoint, fields, k=0, bisect_iter=0, gpu=False):
                                  model_opt.loss_alpha)
     if not hasattr(model_opt, 'global_attention_alpha'):
         model_opt.global_attention_alpha = alpha_lookup[model_opt.global_attention_function]
+    if not hasattr(model_opt, 'global_attention_bisect_iter'):
+        model_opt.global_attention_bisect_iter = 0
     model = build_base_model(model_opt, fields, gpu, checkpoint)
 
     assert opt.k == 0 or opt.bisect_iter == 0, \
