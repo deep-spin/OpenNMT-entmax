@@ -87,11 +87,13 @@ def load_model(checkpoint, fields, k=0, bisect_iter=0, gpu=False):
 
 
     model_opt = checkpoint['opt']
-    model = build_base_model(model_opt, fields, gpu, checkpoint)
-
     alpha_lookup = {'softmax': 1.0, 'tsallis15': 1.5, 'sparsemax': 2.0}
     gen_alpha = alpha_lookup.get(model_opt.generator_function,
                                  model_opt.loss_alpha)
+    if not hasattr(model_opt, 'global_attention_alpha'):
+        model_opt.global_attention_alpha = alpha_lookup[model_opt.global_attention_function]
+    model = build_base_model(model_opt, fields, gpu, checkpoint)
+
     assert opt.k == 0 or opt.bisect_iter == 0, \
         "Bisection and topk are mutually exclusive ! !"
     if gen_alpha == 1.0:
