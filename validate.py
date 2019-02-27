@@ -14,9 +14,9 @@ from onmt.model_builder import build_base_model
 
 
 class Validator(object):
-    def __init__(self, model, padding_idx):
+    def __init__(self, model, tgt_padding_idx):
         self.model = model
-        self.padding_idx = padding_idx
+        self.tgt_padding_idx = tgt_padding_idx
 
         # Set model in training mode.
         self.model.eval()
@@ -24,16 +24,14 @@ class Validator(object):
     def validate(self, valid_iter):
         """ Validate model.
             valid_iter: validate data iterator
-        Returns:
-            :obj:`nmt.Statistics`: validation loss statistics
         """
         # Set model in validating mode.
-        stats = {'support': 0, 'tgt_words': 0, 'attended_pos': 0}
-        # what
+        stats = {'support': 0, 'tgt_words': 0, 'src_words': 0, 'attended': 0, 'attended_possible': 0}
         with torch.no_grad():
             for batch in valid_iter:
                 src = make_features(batch, 'src', 'text')
                 _, src_lengths = batch.src
+                stats['src_words'] += src_lengths.sum().item()
 
                 tgt = make_features(batch, 'tgt')
 
@@ -43,49 +41,47 @@ class Validator(object):
                 bottled_out = outputs.view(-1, outputs.size(-1))
                 generator_out = self.model.generator(bottled_out)
 
+                tgt_lengths = tgt[1:].squeeze(2).ne(self.tgt_padding_idx).sum(dim=0)
+                grid_sizes = src_lengths * tgt_lengths
+                stats['attended_possible'] += grid_sizes.sum().item()
+
                 out_support = generator_out.gt(0).sum(dim=1)
-                tgt_non_pad = tgt[1:].ne(self.padding_idx).view(-1)
+                tgt_non_pad = tgt[1:].ne(self.tgt_padding_idx).view(-1)
                 support_non_pad = out_support.masked_select(tgt_non_pad)
+                tgt_words = support_non_pad.size(0)
                 stats['support'] += support_non_pad.sum().item()
-                stats['tgt_words'] += support_non_pad.size(0)
+                stats['tgt_words'] += tgt_words
 
                 attn = attns['std']
                 attn = attn.view(-1, attn.size(-1))
-                attended = attn.ne(0).sum(dim=1)
+                attended = attn.gt(0).sum(dim=1)
                 attended_non_pad = attended.masked_select(tgt_non_pad)
-                stats['attended_pos'] += attended_non_pad.sum().item()
+                stats['attended'] += attended_non_pad.sum().item()
+                '''
+                print(src.size())
+                print(tgt.size())
+                foo = attns['std'].squeeze(1)
+                print(foo.size())
+                print(foo.sum())
+                # what's going on here: the tgt is size 10, the src is size 8,
+                # the attention is (9 x 8).
+                print('attn nonzeros', foo.gt(0).sum().item())
+                print('total src words', src_lengths.sum().item())
+                print('total tgt words', tgt_lengths.sum().item())
+                print('src seq', [self.fields['src'].vocab.itos[i] for i in src])
+                print('tgt seq', [self.fields['tgt'].vocab.itos[i] for i in tgt])
+                print(foo)
+                '''
 
         return stats
 
 
-def build_validator(model, fields):
-    """
-
-    Args:
-        model (:obj:`onmt.models.NMTModel`): the model to train
-        fields (dict): dict of fields
-        optim (:obj:`onmt.utils.Optimizer`): optimizer used during training
-        data_type (str): string describing the type of data
-            e.g. "text", "img", "audio"
-        model_saver(:obj:`onmt.models.ModelSaverBase`): the utility object
-            used to save the model
-    """
-    padding_idx = fields['tgt'].vocab.stoi[PAD_WORD]
-
-    return Validator(model, padding_idx)
-
-
 def build_dataset_iter(datasets, fields, batch_size, use_gpu):
     device = "cuda" if use_gpu else "cpu"
-
-    batch_size_fn = None
-    return DatasetLazyIter(datasets, fields, batch_size, batch_size_fn,
-                           device, False)
+    return DatasetLazyIter(datasets, fields, batch_size, None, device, False)
 
 
 def load_model(checkpoint, fields, k=0, bisect_iter=0, gpu=False):
-
-
     model_opt = checkpoint['opt']
     alpha_lookup = {'softmax': 1.0, 'tsallis15': 1.5, 'sparsemax': 2.0}
     if not hasattr(model_opt, 'loss_alpha'):
@@ -141,8 +137,12 @@ def main(opt):
         model = load_model(
             checkpoint, fields, k=opt.k, bisect_iter=opt.bisect_iter, gpu=opt.gpu)
 
-        validator = build_validator(model, fields)
-        print(model.generator)
+        tgt_padding_idx = fields['tgt'].vocab.stoi[PAD_WORD]
+
+        validator = Validator(model, tgt_padding_idx)
+        if opt.verbose:
+            print(model.decoder.attn)
+            print(model.generator)
 
         # I hate that this has to load the data twice
         dataset = torch.load(opt.data + '.' + 'valid' + '.0.pt')
@@ -151,13 +151,15 @@ def main(opt):
             iter([dataset]), fields, opt.batch_size, opt.gpu)
 
         valid_stats = validator.validate(valid_iter_fct())
-        print('avg. attended positions/tgt word: {}'.format(valid_stats['attended_pos'] / valid_stats['tgt_words']))
+        print('avg. attended positions/tgt word: {}'.format(valid_stats['attended'] / valid_stats['tgt_words']))
         print('avg. support size: {}'.format(valid_stats['support'] / valid_stats['tgt_words']))
+        print('attention density: {}'.format(valid_stats['attended'] / valid_stats['attended_possible']))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('data')
+    parser.add_argument('-verbose', action='store_true')
     parser.add_argument('-gpu', action='store_true')
     parser.add_argument('-models', nargs='+')
     parser.add_argument('-batch_size', default=64, type=int)
