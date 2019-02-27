@@ -151,7 +151,7 @@ def main(opt):
             iter([dataset]), fields, opt.batch_size, opt.gpu)
 
         valid_stats = validator.validate(valid_iter_fct())
-        # print('avg. attended positions/tgt word: {}'.format(valid_stats['attended_pos'] / valid_stats['tgt_words']))
+        print('avg. attended positions/tgt word: {}'.format(valid_stats['attended_pos'] / valid_stats['tgt_words']))
         print('avg. support size: {}'.format(valid_stats['support'] / valid_stats['tgt_words']))
 
 
