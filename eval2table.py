@@ -3,6 +3,7 @@
 import sys
 import argparse
 from itertools import cycle
+import numpy as np
 import pandas as pd
 from os.path import basename, split
 import re
@@ -75,7 +76,9 @@ def setting_results(df, ensemble=False):
         ensemble_avg = ensemble_run.groupby(['Output', 'Attention']).mean()
         return pd.concat([singles_avg, ensemble_avg], axis=1)
     else:
-        return singles_avg
+        singles_std = single_runs.groupby(['Output', 'Attention']).apply(np.std)
+        # singles_std['BLEU'] = 'pm ' + singles_std['BLEU'].apply(str)
+        return pd.concat([singles_avg, singles_std], axis=1)
 
 
 def main():
@@ -90,7 +93,9 @@ def main():
 
     all_results = [setting_results(setting, opt.task == 'morph')
                    for setting in results]
-    print(pd.concat(all_results, axis=1).to_latex(float_format='%.2f'))
+    tex = pd.concat(all_results, axis=1).to_latex(float_format='%.2f')
+    # print(re.sub(r'pm', '$\pm$', tex))
+    print(tex)
 
 
 if __name__ == '__main__':
