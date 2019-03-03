@@ -48,13 +48,23 @@ def beams_to_table(beams):
         data['language'].append(k)
         data['samples'].append(len(v))
         data['single hypothesis'].append(totally_sparse_rate(v))
+        data['all_in_beam'].append(all_in_beam_rate(v))
         # data['avg beam probability'].append(avg_beam_prob(v))
     return pd.DataFrame(data)
 
 
 # this is maybe not exactly what I should do
 def totally_sparse_rate(beams):
-    return sum(b[1] <= EPSILON for b in beams) / len(beams)
+    return sum(beam[1] <= EPSILON for beam in beams) / len(beams)
+
+
+def contains_all_mass(beam):
+    beam_prob = sum(math.exp(b) for b in beam)
+    return beam_prob >= 1
+
+
+def all_in_beam_rate(beams):
+    return sum(contains_all_mass(beam) for beam in beams) / len(beams)
 
 
 def avg_beam_prob(beams):
